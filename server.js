@@ -13,6 +13,7 @@ import { createZubra } from '@zubra/server';
 import { signedCookie } from '@potomac-solutions/kit/auth';
 import { createStaff } from '@potomac-solutions/kit/staff';
 import { staffPages } from '@potomac-solutions/kit/staff/pages';
+import { createNotices } from '@potomac-solutions/kit/notice';
 import { loadQr } from '@journey-to-code/symbology';
 import { createRentals, dayLabel } from './src/rentals.js';
 import { layout, escape } from './src/layout.js';
@@ -38,12 +39,15 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfi
   // shop's own log; their pages and routes are the kit's too.
   const production = process.env.NODE_ENV === 'production';
   const staff = createStaff({ store: desk.store, secure: production, ...(staffCost ? { cost: staffCost } : {}) });
-  const pages = staffPages({ staff, home: '/counter', business: shop.name, secure: production, render: (res, title, body) => page(res, zubra.page(), title, body) });
+  // A message in an address shows only if the server signed it (kit/notice), so a link can't put
+  // its own words in a page's alert.
+  const notices = createNotices({ secret });
+  const pages = staffPages({ staff, notices, proxies: Number(process.env.TRUST_PROXIES ?? 0), home: '/counter', business: shop.name, secure: production, render: (res, title, body) => page(res, zubra.page(), title, body) });
   const send = (res, status, html) => (res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' }), res.end(html));
-  const back = (res, location) => (res.writeHead(303, { location }), res.end());
+  const back = (res, location) => (res.writeHead(303, { location: notices.sign(location) }), res.end());
   const page = (res, p, title, body) => send(res, 200, p.finish(layout({ title, shop, body })));
   const said = (url) => {
-    const problem = (url.searchParams.get('problem') ?? '').slice(0, 200);
+    const problem = notices.read(url).problem;
     return problem ? `<p class="notice" role="alert">${escape(problem)}</p>` : '';
   };
   const withProblem = (path, answer) => `${path}?problem=${encodeURIComponent(answer.error)}`;
@@ -106,7 +110,7 @@ ${said(url)}
       ready: booking.state === 'held' || booking.state === 'failed',
     };
     return `<section><a href="/book/${booking.key}/riders">Back to riders</a><h1>Pay</h1><p class="lede">Held until ${time(booking.until)}. Waiver signed by ${escape(desk.waiver(booking.key).signedBy)}.</p></section>
-${p.render('checkout-form', { cart, place: '/book', checkout: booking.key, problem: (url.searchParams.get('problem') ?? '').slice(0, 200), testMode: true, name: desk.waiver(booking.key).signedBy })}`;
+${p.render('checkout-form', { cart, place: '/book', checkout: booking.key, problem: notices.read(url).problem, testMode: true, name: desk.waiver(booking.key).signedBy })}`;
   }
 
   function rentalPage(p, rental) {
@@ -120,7 +124,7 @@ ${p.render('rental-status', { rental: rental.key, statusNow: rental.status, outN
     const day = desk.counter();
     const row = (rental, action, label) =>
       `<tr><td><strong>${escape(rental.name || rental.signedBy)}</strong><br><small>${escape(rental.key)}</small></td><td>${escape(rental.fleet.name)}: ${escape(rental.units.join(', '))}<br><small>${rental.days.map(dayLabel).join(', ')}</small></td><td>${rental.riders.map((rider) => `${escape(rider.unit)}: ${escape(rider.name)} (${escape(rider.size)})`).join('<br>')}</td><td><form method="post" action="/counter/${action}"><input type="hidden" name="code" value="${escape(rental.key)}"><button type="submit">${label}</button></form></td></tr>`;
-    const done = url.searchParams.get('done');
+    const done = notices.read(url).done;
     return `<section><h1>The counter</h1><p class="lede">Today, ${dayLabel(day.today)}. Hand rentals out and take them back; guests see it on their phones.</p></section>
 ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}</p>` : ''}
 <form class="panel" method="post" action="/counter/out"><h2>A code from a guest</h2><label>Rental code<input name="code" autocomplete="off" spellcheck="false" required></label><button type="submit">Hand out</button></form>

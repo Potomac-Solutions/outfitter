@@ -18,6 +18,13 @@ async function withOwner(server) {
 }
 import { bookableDays } from '../src/rentals.js';
 
+// A redirect's location as words: the signature on its message (kit/notice) checked and taken off.
+const plain = (location) => {
+  location = String(location ?? '');
+  if (/[?&](problem|done)=/.test(location) && !location.startsWith('?')) assert.match(location, /&sig=[\w-]{22}/, `unsigned message: ${location}`);
+  return decodeURIComponent(location.replace(/&sig=[\w-]+/, '').replaceAll('+', ' '));
+};
+
 const dir = mkdtempSync(join(tmpdir(), 'outfitter-'));
 const errors = [];
 let browser;
@@ -59,7 +66,7 @@ async function phone(site, name, { javaScriptEnabled = true } = {}) {
   /** A plain form post, as the page's own forms make it: where the server sends the browser. */
   const post = async (path, form, headers = {}) => {
     const response = await context.request.post(`${site.base}${path}`, { form, headers, maxRedirects: 0 });
-    return { status: response.status(), location: decodeURIComponent(response.headers().location ?? '') };
+    return { status: response.status(), location: plain(response.headers().location ?? '') };
   };
   const get = async (path) => (await context.request.get(`${site.base}${path}`)).text();
   return { context, page, post, get };
@@ -82,7 +89,7 @@ const keyOf = (html) => /name="key" value="(r[a-z0-9]+)"/.exec(html)?.[1];
 async function postPools(site, guest, fleet, days, count) {
   const body = new URLSearchParams([...days.map((i) => ['pool', `${fleet}/${bookableDays()[i]}`]), ['count', String(count)]]).toString();
   const response = await guest.context.request.post(`${site.base}/rent/${fleet}/hold`, { data: body, headers: { 'content-type': 'application/x-www-form-urlencoded' }, maxRedirects: 0 });
-  return { status: response.status(), location: decodeURIComponent(response.headers().location ?? '') };
+  return { status: response.status(), location: plain(response.headers().location ?? '') };
 }
 const free = (site, fleet, day) => site.server.desk.days(site.server.desk.fleet(fleet)).find((one) => one.pool === `${fleet}/${bookableDays()[day]}`).free;
 
