@@ -1,0 +1,34 @@
+<!--
+  Where a rental is: booked, out, back. A Sync document only the server writes ('use collection
+  rentals by rental'); the page may read it because it's this guest's own. When the counter hands
+  the boats out or takes them back, the guest's page follows without a reload.
+-->
+<script>
+  'use collection rentals by rental'
+  import { from } from '@zubra/runtime'
+
+  let status = from(statusNow)
+  let out = from(outNow)
+  let returned = from(returnedNow)
+
+  const at = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone })
+  const steps = ['booked', 'out', 'returned']
+  const labels = { booked: 'Booked', out: 'Out', returned: 'Returned' }
+  const reached = steps.indexOf(status)
+</script>
+<style>
+  :host { display: block; }
+  ol { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+  li { padding: 0.35rem 0.8rem; border-radius: 999px; box-shadow: 0 0 0 1px var(--border, #c9d6dc); color: var(--muted-foreground, #5b6b73); font-weight: 600; }
+  li.done { background: var(--primary, #1f6f8b); color: var(--primary-foreground, #fff); box-shadow: none; }
+  p { margin: 0.5rem 0 0; color: var(--muted-foreground, #5b6b73); }
+</style>
+<rental-status rental="" status-now="booked" out-now={0} returned-now={0} time-zone="America/New_York">
+  <ol aria-label="Where your rental is">
+    <zb-each items={steps} as="step" key={step}>
+      <li class:done={steps.indexOf(step) <= reached} aria-current={step === status ? 'step' : null}>{labels[step]}</li>
+    </zb-each>
+  </ol>
+  <p zb-if={status === 'out' && out}>Handed out at {at(out)}.</p>
+  <p zb-if={status === 'returned' && returned}>Back at {at(returned)}. Thanks for renting with us.</p>
+</rental-status>

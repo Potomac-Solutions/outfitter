@@ -1,0 +1,26 @@
+<!--
+  The staff's note about today (the water, the wind, the trails), live. A Sync document only the
+  server writes ('use collection conditions by shop'): when the counter posts a new note, every
+  open page shows it without a reload. The server HTML already has it (`text-now`).
+-->
+<script>
+  'use collection conditions by shop'
+  import { from } from '@zubra/runtime'
+
+  let text = from(textNow)
+  let at = from(atNow)
+
+  const when = at ? new Date(at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone }) : ''
+</script>
+<style>
+  :host { display: block; }
+  aside { display: grid; gap: 0.2rem; padding: 0.9rem 1.1rem; border-radius: var(--radius, 0.75rem); background: var(--note, #e6f2f7); border-left: 4px solid var(--primary, #1f6f8b); }
+  p { margin: 0; }
+  small { color: var(--muted-foreground, #5b6b73); }
+</style>
+<conditions-note shop="" text-now="" at-now={0} time-zone="America/New_York">
+  <aside zb-if={text} aria-live="polite">
+    <p><strong>Today on the lake:</strong> {text}</p>
+    <small zb-if={when}>Posted at {when}</small>
+  </aside>
+</conditions-note>
