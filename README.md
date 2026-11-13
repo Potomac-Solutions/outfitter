@@ -8,10 +8,12 @@ The shop it starts with, Lakeside Paddle & Pedal on Deep Creek Lake, is made up.
 
 `npm install`, then `npm start`, and open http://localhost:3000. Two browser windows side by side (one private, so it's another person) show the live parts best.
 
+**Staff sign in with their own accounts.** The first time, nobody has one, so the server prints a setup link: open it to make the owner (your email, name and a password). The owner's **People** page invites the rest of the staff (an invite is a link to send them), resets passwords and turns people off.
+
 1. **Book.** Choose Kayaks, tick two days (a Saturday shows the weekend price) and how many, and **Hold**. You get the same kayaks every day you booked.
 2. **Riders and waiver.** Press **Book**: name each rider and their size, agree to the waiver, and sign with your full name. You can't pay without it.
 3. **Pay** with any card number (`4000 0000 0000 0002` is declined, to see that; your hold stays). You get the rental with its pickup code, and it's listed on the home page.
-4. **At the counter.** In the other window, open **The counter (staff)** from the footer and start a shift. Today's pickups show each rider and size. **Hand out** a rental (or type its code): the guest's page shows **Out** without a reload. **Take back** marks it returned.
+4. **At the counter.** In the other window, open **The counter (staff)** from the footer and sign in. Today's pickups show each rider and size. **Hand out** a rental (or type its code): the guest's page shows **Out** without a reload. **Take back** marks it returned.
 5. **Today's note.** Post one at the counter ("Calm until noon, water 66°F"). Every open home page shows it at once.
 6. **Without JavaScript** (turn it off in the browser's settings), all of it works the same.
 
@@ -19,7 +21,7 @@ The shop it starts with, Lakeside Paddle & Pedal on Deep Creek Lake, is made up.
 
 | Piece | Job |
 | --- | --- |
-| [Potomac kit](https://github.com/Potomac-Solutions/kit) (private) | `hold` (who has which boat, and when a hold ends), `reserve` (the same boats on every day of a booking, priced, paid once), `pay` (charged at most once; its test provider), `stages` (a rental: booked, out, returned), `price` (the weekend rule), `auth` (the guest and counter cookies), `store` (the Sync log). The kit's `slot-picker`, `booking-summary` and `checkout-form`, from its package |
+| [Potomac kit](https://github.com/Potomac-Solutions/kit) (private) | `hold` (who has which boat, and when a hold ends), `reserve` (the same boats on every day of a booking, priced, paid once), `pay` (charged at most once; its test provider), `stages` (a rental: booked, out, returned), `price` (the weekend rule), `staff` and `staff/pages` (the owner and staff: passwords, sessions, invites, roles, and their pages), `auth` (the guest and counter cookies), `store` (the Sync log). The kit's `slot-picker`, `booking-summary` and `checkout-form`, from its package |
 | `@zubra/server` | Renders every page before any JavaScript runs |
 | `@zubra/sync` | The log (one SQLite file). The conditions note and each rental's status are documents only the server writes; pages follow them live, and read only the note and their own rentals |
 | [symbology](https://github.com/journey-to-code-org/symbology) | Draws the pickup code (the rental's code) |
@@ -42,7 +44,7 @@ Node 22.13 or later. `SESSION_SECRET` is required in production; `DATA_DIR` says
 2. The waiver comes first: each missing piece is refused with its own message, and paying before signing goes back to it.
 3. The last bike on a day goes to one person, even when two ask at the same moment; a booking gets the same bikes every day or none; letting go frees them.
 4. A declined card keeps the hold for another try, and the same booking is paid on the second. Another guest can't pay for it or see it. A hold that runs out books nothing.
-5. The counter needs a shift; it sees riders and sizes; it hands a rental out once and takes it back once, and the guest sees each step live.
+5. The counter needs a staff sign-in; it sees riders and sizes; it hands a rental out once and takes it back once, and the guest sees each step live.
 6. The note the counter posts reaches every open page at once, and is in the page without JavaScript.
 7. A page reads the note and its own rentals, nothing else, even when it asks; it writes nothing; another site's post is refused.
 8. With JavaScript, the whole booking in the browser; the kit's components come from its package.

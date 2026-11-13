@@ -7,6 +7,15 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { loadQr } from '@journey-to-code/symbology';
 import { createApp } from '../server.js';
+
+// The owner every test shop starts with, set up from the shop's setup link; cheap hashing for tests.
+const OWNER = { email: 'owner@example.com', name: 'Test Owner', password: 'test owner password' };
+const COST = { N: 2 ** 10, r: 8, p: 1 };
+async function withOwner(server) {
+  const made = await server.staff.accept(await server.staff.setup(), OWNER);
+  if (!made.ok) throw new Error(made.error);
+  return server;
+}
 import { bookableDays } from '../src/rentals.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'outfitter-'));
@@ -16,7 +25,7 @@ let app;
 let quick; // holds that run out in a second and a half
 
 async function start(name, options = {}) {
-  const server = await createApp({ db: join(dir, `${name}.db`), cache: false, secret: 'test', ...options });
+  const server = await withOwner(await createApp({ staffCost: COST, db: join(dir, `${name}.db`), cache: false, secret: 'test', ...options }));
   await new Promise((done) => server.listen(0, done));
   return { server, base: `http://localhost:${server.address().port}` };
 }
@@ -205,13 +214,13 @@ test('the counter hands a rental out and takes it back, each once; the guest see
 
   // Not on a shift: no counter, and its posts do nothing.
   const outsider = await phone(app, 'outsider', { javaScriptEnabled: false });
-  assert.match(await outsider.get('/counter'), /Start a counter shift/);
+  assert.match(await outsider.get('/counter'), /<button type=\"submit\">Sign in<\/button>/);
   assert.equal((await outsider.post('/counter/out', { code: key })).location, '/counter');
   assert.equal(app.server.desk.store.get('rentals', key).status, 'booked');
-  assert.equal((await outsider.post('/staff/start', {}, { 'sec-fetch-site': 'cross-site' })).status, 403);
+  assert.equal((await outsider.post('/staff/sign-in', {}, { 'sec-fetch-site': 'cross-site' })).status, 403);
 
   const staff = await phone(app, 'counter', { javaScriptEnabled: false });
-  await staff.post('/staff/start', {});
+  await staff.post('/staff/sign-in', { email: OWNER.email, password: OWNER.password });
   const today = await staff.get('/counter');
   assert.match(today, new RegExp(`Going out today[\\s\\S]*${key}[\\s\\S]*Rider 0 Teets \\(150 to 200 lb\\)`), 'the counter sees riders and sizes');
   assert.equal((await staff.post('/counter/returned', { code: key })).location, '/counter?problem=That rental hasn’t gone out yet.');
@@ -230,7 +239,7 @@ test('the staff post today’s note, and every open page shows it at once', asyn
   await reader.page.waitForFunction(() => customElements.get('conditions-note'));
   await reader.page.waitForTimeout(400);
   const staff = await phone(app, 'note writer', { javaScriptEnabled: false });
-  await staff.post('/staff/start', {});
+  await staff.post('/staff/sign-in', { email: OWNER.email, password: OWNER.password });
   assert.match((await staff.post('/counter/conditions', { text: 'Fog until 9, then calm. Water 64°F.' })).location, /^\/counter\?done=Posted/);
   await reader.page.locator('conditions-note', { hasText: 'Fog until 9, then calm. Water 64°F.' }).waitFor({ timeout: 5000 });
   // Without JavaScript it's in the page.

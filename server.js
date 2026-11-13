@@ -11,6 +11,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createZubra } from '@zubra/server';
 import { signedCookie } from '@potomac-solutions/kit/auth';
+import { createStaff } from '@potomac-solutions/kit/staff';
+import { staffPages } from '@potomac-solutions/kit/staff/pages';
 import { loadQr } from '@journey-to-code/symbology';
 import { createRentals, dayLabel } from './src/rentals.js';
 import { layout, escape } from './src/layout.js';
@@ -19,21 +21,24 @@ const here = dirname(fileURLToPath(import.meta.url));
 const components = join(here, 'src', 'components');
 const money = (cents) => `$${(cents / 100).toFixed(2).replace(/\.00$/, '')}`;
 
-export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfitter.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, now } = {}) {
+export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfitter.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, now , staffCost } = {}) {
   if (!secret) {
     if (process.env.NODE_ENV === 'production') throw new Error('Set SESSION_SECRET.');
     secret = 'outfitter-development-only';
   }
   const desk = await createRentals({ db, holdMs, sweepMs, now });
   const guests = signedCookie({ secret, name: 'guest' });
-  // Staff accounts come later: for the concept, a device starts a counter shift.
-  const staff = signedCookie({ secret, name: 'staff', maxAge: 12 * 3600 });
   desk.identify((request) => guests.session(request));
   const zubra = createZubra({ components, cache, packages: ['@potomac-solutions/kit/components'] });
   const qr = await loadQr();
   const { shop } = desk;
   const time = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: shop.timeZone });
 
+  // The people who run the shop: an owner and the staff they invite (the kit's staff module), in the
+  // shop's own log; their pages and routes are the kit's too.
+  const production = process.env.NODE_ENV === 'production';
+  const staff = createStaff({ store: desk.store, secure: production, ...(staffCost ? { cost: staffCost } : {}) });
+  const pages = staffPages({ staff, home: '/counter', business: shop.name, secure: production, render: (res, title, body) => page(res, zubra.page(), title, body) });
   const send = (res, status, html) => (res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' }), res.end(html));
   const back = (res, location) => (res.writeHead(303, { location }), res.end());
   const page = (res, p, title, body) => send(res, 200, p.finish(layout({ title, shop, body })));
@@ -132,7 +137,8 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
       if (url.pathname === '/health') return res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
       if (url.pathname === '/favicon.ico') return res.writeHead(204).end();
       const guest = guests.ensure(req, res);
-      const onShift = Boolean(staff.read(req.headers.cookie ?? ''));
+      const who = staff.session(req);
+      const onShift = staff.can(who, 'staff');
 
       if (req.method === 'POST') {
         // Every form is ours: another site's post is refused (the cookies are SameSite=Lax too).
@@ -159,10 +165,8 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
           if (done.ok) return back(res, `/rental/${done.key}`);
           return back(res, done.key ? withProblem(done.error === 'Sign the waiver first.' ? `/book/${done.key}/riders` : `/book/${done.key}`, done) : withProblem('/', done));
         }
-        if (url.pathname === '/staff/start') {
-          res.setHeader('set-cookie', staff.cookie('counter'));
-          return back(res, '/counter');
-        }
+        // Sign-in, links, people and passwords.
+        if (await pages.handle(req, res, url, form)) return;
         const moving = url.pathname.match(/^\/counter\/(out|returned)$/);
         if (moving || url.pathname === '/counter/conditions') {
           if (!onShift) return back(res, '/counter');
@@ -179,6 +183,7 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed');
 
+      if (await pages.handle(req, res, url, null)) return;
       const p = zubra.page();
       if (url.pathname === '/') return page(res, p, 'Rentals', home(p, guest));
       const renting = url.pathname.match(/^\/rent\/([a-z]+)$/);
@@ -201,8 +206,8 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
       if (rental) return page(res, p, 'Your rental', rentalPage(p, rental));
 
       if (url.pathname === '/counter') {
-        if (!onShift) return page(res, p, 'The counter', `<section><h1>The counter</h1><p class="lede">This page is for the shop. Staff accounts come later; for the concept, any device can start a shift.</p></section><form method="post" action="/staff/start"><button type="submit">Start a counter shift</button></form>`);
-        return page(res, p, 'The counter', counter(url));
+        if (!onShift) return page(res, p, 'Sign in', pages.signIn(url));
+        return page(res, p, 'The counter', pages.bar(who) + counter(url));
       }
       send(res, 404, 'Not found');
     } catch (error) {
@@ -213,11 +218,12 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
   });
 
   server.on('close', () => desk.close());
-  return Object.assign(server, { desk });
+  return Object.assign(server, { desk, staff });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT ?? 3000);
   const server = await createApp();
+  if (server.staff.needsOwner()) console.log(`Set up the first owner (works once, for a day): http://localhost:${port}/staff/accept?token=${await server.staff.setup()}`);
   server.listen(port, '0.0.0.0', () => console.log(`Outfitter on http://localhost:${port}`));
 }
