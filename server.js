@@ -55,7 +55,7 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfi
     const mine = desk.rentalsFor(guest);
     const conditions = desk.conditions();
     return `<section><h1>Out on ${escape(shop.place)}</h1><p class="lede">${escape(shop.hours)}. Book by the day, sign the waiver online, and pick up at the dock.</p></section>
-${p.render('conditions-note', { shop: 'shop', textNow: conditions.text, atNow: conditions.at, timeZone: shop.timeZone })}
+${p.render('conditions-note', { shop: 'shop', textNow: conditions.text, atNow: conditions.at, atLabel: conditions.at ? new Date(conditions.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: shop.timeZone }) : '', timeZone: shop.timeZone })}
 ${mine.length ? `<section class="panel"><h2>Your rentals</h2><ul>${mine.map((rental) => `<li><a href="/rental/${rental.key}">${rental.units.length} ${escape(rental.units.length === 1 ? rental.fleet.one : rental.fleet.name.toLowerCase())}, ${rental.days.map(dayLabel).join(', ')}</a>${rental.status === 'booked' ? '' : ` · ${rental.status === 'out' ? 'out' : 'returned'}`}</li>`).join('')}</ul></section>` : ''}
 <ul class="fleets">${desk.fleets
       .map(

@@ -10,7 +10,9 @@
   let text = from(textNow)
   let at = from(atNow)
 
-  const when = at ? new Date(at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone }) : ''
+  // The server can't format a time, so it sends it already in words (`at-label`); the element
+  // formats a new one itself when a note is posted live.
+  const when = at === atNow ? atLabel : at ? new Date(at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone }) : ''
 </script>
 <style>
   :host { display: block; }
@@ -18,7 +20,7 @@
   p { margin: 0; }
   small { color: var(--muted-foreground, #5b6b73); }
 </style>
-<conditions-note shop="" text-now="" at-now={0} time-zone="America/New_York">
+<conditions-note shop="" text-now="" at-now={0} at-label="" time-zone="America/New_York">
   <aside zb-if={text} aria-live="polite">
     <p><strong>Today on the lake:</strong> {text}</p>
     <small zb-if={when}>Posted at {when}</small>

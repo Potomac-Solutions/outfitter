@@ -235,7 +235,7 @@ test('the staff post today’s note, and every open page shows it at once', asyn
   await reader.page.locator('conditions-note', { hasText: 'Fog until 9, then calm. Water 64°F.' }).waitFor({ timeout: 5000 });
   // Without JavaScript it's in the page.
   const plain = await phone(app, 'plain reader', { javaScriptEnabled: false });
-  assert.match(await plain.page.locator('conditions-note').innerText(), /Today on the lake: Fog until 9/);
+  assert.match(await plain.page.locator('conditions-note').innerText(), /Today on the lake: Fog until 9[\s\S]*Posted at \d{1,2}:\d{2} [AP]M/);
   await Promise.all([reader.context.close(), staff.context.close(), plain.context.close()]);
 });
 
