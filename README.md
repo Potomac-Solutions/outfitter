@@ -41,7 +41,7 @@ The shop it starts with, Lakeside Paddle & Pedal on Deep Creek Lake, is made up.
 | `src/shop.js` | The shop, what it rents, prices, sizing questions and waiver, as data |
 | `src/rentals.js` | The shop's side: which days and boats exist, riders and waivers, the counter, the note, the owner's settings, the staff activity, and the words |
 | `kit/customers` | Customer accounts: sign-up, sign-in with lockout, sessions, reset links, turned off by an owner |
-| `kit/reports`, `src/chart.js` | The numbers by day, week or month in the shop's zone, and CSV; charts drawn on the server as SVG, with a table under each |
+| `kit/reports`, `kit/charts` | The numbers by day, week or month in the shop's zone, and CSV; charts drawn on the server as SVG, with a table under each |
 | `src/site.js`, `src/admin.js` | The landing page and account pages; the admin pages |
 | `bin/seed.js` | The demo data |
 

@@ -1,4 +1,6 @@
 // The page around the components: the shop's frame, its colours, and the connection to the log.
+import { CHART_CSS } from '@potomac-solutions/kit/charts';
+
 export const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const STYLE = `
@@ -79,20 +81,6 @@ const STYLE = `
   .muted { color: var(--muted-foreground); }
   .num { text-align: right; font-variant-numeric: tabular-nums; }
   .pager { display: flex; gap: 1rem; align-items: center; }
-  .chart { margin: 0; display: grid; gap: 0.5rem; }
-  .chart svg { width: 100%; height: auto; }
-  .chart .bar { fill: var(--primary); }
-  .chart .col:hover .bar { fill: #15485c; }
-  .chart .hit { fill: transparent; }
-  .chart .grid { stroke: var(--border); stroke-dasharray: 3 3; }
-  .chart .axis { stroke: var(--muted-foreground); }
-  .chart .tick { fill: var(--muted-foreground); font-size: 11px; }
-  .chart-table summary { cursor: pointer; color: var(--muted-foreground); font-size: 0.9rem; }
-  .ranks { display: grid; gap: 0.5rem; margin: 0; padding: 0 !important; list-style: none; }
-  .ranks li { display: grid; grid-template-columns: 9rem 1fr 6rem; gap: 0.75rem; align-items: center; }
-  .rank-track { height: 0.75rem; border-radius: 4px; background: var(--muted); overflow: hidden; }
-  .rank-bar { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--primary); }
-  .rank-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
   form.inline { display: inline; }
   .stack { display: grid; gap: 0.75rem; }
   dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0; }
@@ -115,7 +103,7 @@ export function layout({ title, shop, body, nav = {}, wide = false, here = '' })
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>${escape(title)} · ${escape(shop.name)}</title>
-  <style>${STYLE}</style>
+  <style>${STYLE}${CHART_CSS}</style>
 </head>
 <body>
   <p class="concept">${escape(shop.concept)}</p>

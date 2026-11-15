@@ -6,7 +6,7 @@ import { series, totals, breakdown, csv } from '@potomac-solutions/kit/reports';
 import { escape } from './layout.js';
 import { dayLabel, bookableDays } from './rentals.js';
 import { money } from './site.js';
-import { barChart, rankBars } from './chart.js';
+import { barChart, rankBars } from '@potomac-solutions/kit/charts';
 
 const DAY = 86_400_000;
 const STATUS = { booked: 'Booked', out: 'Out', returned: 'Returned' };
