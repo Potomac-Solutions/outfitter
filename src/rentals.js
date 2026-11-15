@@ -12,6 +12,9 @@
 //   rentals/<key>                 a paid booking: booked → out → returned (kit stages)
 //   waivers/<key>                 riders, their sizes, who signed and when
 //   conditions/shop               the note on the home page, live
+//   settings/shop, settings/<fleet>  what the owner changed from the admin pages
+//   audit/<key>                   who on the staff did what, and when
+//   customers, customer-sessions, customer-tokens   customer accounts (kit customers)
 import { createSyncServer } from '@zubra/sync/server';
 import { sqliteLog } from '@zubra/sync/sqlite';
 import { syncStore, serverOnly, SERVER_ONLY } from '@potomac-solutions/kit/store';
@@ -37,6 +40,12 @@ export function bookableDays(now = Date.now()) {
 /** "Sat 21 Nov" for a `YYYY-MM-DD` (noon UTC, so the date is the same everywhere). */
 export const dayLabel = (date) => new Intl.DateTimeFormat('en-US', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
 
+const pick = (doc, names) => Object.fromEntries(names.filter((name) => doc?.[name] !== undefined).map((name) => [name, doc[name]]));
+const cents = (text) => {
+  const match = /^\$?\s*(\d{1,5})(?:\.(\d{1,2}))?$/.exec(String(text ?? '').trim());
+  return match ? Number(match[1]) * 100 + Number((match[2] ?? '0').padEnd(2, '0')) : null;
+};
+
 const poolOf = (fleet, date) => `${fleet}/${date}`;
 const parsePool = (pool) => {
   const at = pool.indexOf('/');
@@ -46,20 +55,35 @@ const parsePool = (pool) => {
 export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, sweepMs = 1000, now = Date.now } = {}) {
   // Who is asking, from a request: server.js says how.
   let who = () => null;
-  const mine = (pub) => store.under('rentals').filter((rental) => rental.holder === pub).map((rental) => rental.key);
+  // A guest's rentals are the ones booked from their browser, and, signed in, their account's.
+  const owns = (guest, rental) => Boolean(guest && (rental.holder === guest.pub || (guest.customer && rental.customer === guest.customer)));
+  const mine = (guest) => store.under('rentals').filter((rental) => owns(guest, rental)).map((rental) => rental.key);
 
   const sync = createSyncServer({
     log: await sqliteLog(db),
     // Pages write nothing: every collection here is the server's.
-    authorize: serverOnly([...SERVER_ONLY, 'rentals', 'waivers', 'conditions'], ({ kind }) => kind === 'read'),
+    authorize: serverOnly([...SERVER_ONLY, 'rentals', 'waivers', 'conditions', 'settings', 'audit'], ({ kind }) => kind === 'read'),
     // A page reads the conditions note and its own rentals; nobody else's names or sizes.
     scope({ request }) {
       const guest = who(request);
-      const keys = guest ? mine(guest.pub) : [];
+      const keys = guest ? mine(guest) : [];
       return { conditions: true, ...(keys.length ? { rentals: keys } : {}) };
     },
   });
   const store = await syncStore(sync);
+
+  // What the owner changed: written over the defaults in shop.js, in place, so prices and words
+  // everywhere (the weekend rule included) follow.
+  const weekendRules = fleets.map((fleet) => ({ label: 'Weekend', when: { fleet: fleet.id, day: [0, 6] }, set: fleet.weekend }));
+  const defaults = { shop: { hours: shop.hours, pickup: shop.pickup, waiver: [...shop.waiver] }, fleets: Object.fromEntries(fleets.map((f) => [f.id, { cents: f.cents, weekend: f.weekend, blurb: f.blurb }])) };
+  function applySettings() {
+    Object.assign(shop, defaults.shop, pick(store.get('settings', 'shop'), ['hours', 'pickup', 'waiver']));
+    fleets.forEach((fleet, i) => {
+      Object.assign(fleet, defaults.fleets[fleet.id], pick(store.get('settings', fleet.id), ['cents', 'weekend', 'blurb']));
+      weekendRules[i].set = fleet.weekend;
+    });
+  }
+  applySettings();
 
   const holds = createHolds({ store, holdMs, sweepMs, max: 6, now });
   const rentals = createStages({ store, collection: 'rentals', steps: ['booked', 'out', 'returned'], may: ({ to }) => to === 'out' || to === 'returned', now });
@@ -70,7 +94,7 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
     stages: rentals,
     base: (unit, pool) => fleetsById.get(parsePool(pool).fleet).cents,
     // Weekend days cost the fleet's weekend price.
-    rules: fleets.map((fleet) => ({ label: 'Weekend', when: { fleet: fleet.id, day: [0, 6] }, set: fleet.weekend })),
+    rules: weekendRules,
     context: (pool) => {
       const { fleet, date } = parsePool(pool);
       return { fleet, ...moment(new Date(`${date}T12:00:00Z`), 'UTC') };
@@ -161,6 +185,7 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
 
     /** Pay for a held, signed booking. Paid: the boats are taken on every day, and it's a rental. */
     async book(guest, form) {
+      // `guest.customer`, when signed in, goes on the rental so it follows the account.
       const key = String(form.get('checkout') ?? '');
       const booking = KEY.test(key) && store.get('bookings', key);
       if (!guest || !booking || booking.holder !== guest.pub) return { error: 'Your hold ran out. Pick your days again.' };
@@ -168,7 +193,7 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
       if (!waiver) return { error: 'Sign the waiver first.', key };
       const done = await reserve.book(guest.pub, key, {
         method: { card: String(form.get('card') ?? '') },
-        fields: { name: String(form.get('name') ?? '').trim().slice(0, 80), email: String(form.get('email') ?? '').trim().slice(0, 200), phone: String(form.get('phone') ?? '').trim().slice(0, 40), fleet: parsePool(booking.pools[0]).fleet, days: booking.pools.map((pool) => parsePool(pool).date), signedBy: waiver.signedBy },
+        fields: { name: String(form.get('name') ?? '').trim().slice(0, 80), email: String(form.get('email') ?? '').trim().slice(0, 200), phone: String(form.get('phone') ?? '').trim().slice(0, 40), fleet: parsePool(booking.pools[0]).fleet, days: booking.pools.map((pool) => parsePool(pool).date), signedBy: waiver.signedBy, customer: guest.customer ?? '' },
         description: `${shop.name} rental (test mode)`,
       });
       return done.ok ? { ok: true, key } : { ...words(done), key };
@@ -177,7 +202,7 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
     /** A rental the guest owns, or null. */
     rental(guest, key) {
       const rental = KEY.test(key) && store.get('rentals', key);
-      return rental && guest && rental.holder === guest.pub ? { key, ...rental, fleet: fleetsById.get(rental.fleet) } : null;
+      return rental && owns(guest, rental) ? { key, ...rental, fleet: fleetsById.get(rental.fleet) } : null;
     },
 
     /** The guest's rentals, soonest first. */
@@ -185,7 +210,7 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
       if (!guest) return [];
       return store
         .under('rentals')
-        .filter((rental) => rental.holder === guest.pub)
+        .filter((rental) => owns(guest, rental))
         .map((rental) => ({ ...rental, fleet: fleetsById.get(rental.fleet) }))
         .sort((a, b) => (a.days[0] < b.days[0] ? -1 : 1));
     },
@@ -221,6 +246,69 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
       return { ok: true };
     },
     conditions: () => store.get('conditions', 'shop') ?? { text: '', at: 0 },
+
+    /** On signing in or up: this browser's rentals with no account join the customer's. */
+    async claim(guest, customer) {
+      let claimed = 0;
+      for (const rental of store.under('rentals')) {
+        if (rental.holder === guest?.pub && !rental.customer) {
+          await store.write('rentals', rental.key, { customer });
+          claimed++;
+        }
+      }
+      return claimed;
+    },
+
+    /** Every rental, newest booking first, for the admin pages. With riders, never the card. */
+    allRentals() {
+      return store
+        .under('rentals')
+        .map((rental) => ({ ...rental, fleet: fleetsById.get(rental.fleet) }))
+        .sort((a, b) => (b.booked ?? 0) - (a.booked ?? 0));
+    },
+    /** One rental for the staff, whoever booked it, with its waiver. */
+    staffRental(key) {
+      const rental = KEY.test(String(key)) && store.get('rentals', key);
+      return rental ? { key, ...rental, fleet: fleetsById.get(rental.fleet), waiver: store.get('waivers', key) } : null;
+    },
+
+    /** Something someone on the staff did, for the activity list. */
+    async audit(by, what, ref = '') {
+      const key = `a${now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+      await store.write('audit', key, { by: by?.name ?? 'System', what: String(what).slice(0, 200), ref, at: now() });
+    },
+    activity: (limit = 20) => store.under('audit').sort((a, b) => b.at - a.at).slice(0, limit),
+
+    /** The owner changes a fleet's prices and description. */
+    async setFleet(id, form) {
+      const fleet = fleetsById.get(id);
+      if (!fleet) return { error: 'No such fleet.' };
+      const day = cents(form.get('cents'));
+      const weekend = cents(form.get('weekend'));
+      const blurb = String(form.get('blurb') ?? '').trim().slice(0, 200);
+      if (day === null || day < 100) return { error: `Give ${fleet.name.toLowerCase()} a day price, like 40 or 39.50.` };
+      if (weekend === null || weekend < 100) return { error: `Give ${fleet.name.toLowerCase()} a weekend price.` };
+      if (!blurb) return { error: `Describe ${fleet.name.toLowerCase()} in a line.` };
+      await store.write('settings', id, { cents: day, weekend, blurb });
+      applySettings();
+      return { ok: true, fleet };
+    },
+
+    /** The owner changes the shop's hours, pickup words and waiver (one line per point). */
+    async setShop(form) {
+      const hours = String(form.get('hours') ?? '').trim().slice(0, 120);
+      const pickup = String(form.get('pickup') ?? '').trim().slice(0, 240);
+      const waiver = String(form.get('waiver') ?? '')
+        .split(/\r?\n/)
+        .map((line) => line.trim().slice(0, 400))
+        .filter(Boolean)
+        .slice(0, 12);
+      if (!hours || !pickup) return { error: 'Give the hours and the pickup words.' };
+      if (!waiver.length) return { error: 'The waiver needs at least one point.' };
+      await store.write('settings', 'shop', { hours, pickup, waiver });
+      applySettings();
+      return { ok: true };
+    },
 
     close() {
       holds.close?.();
