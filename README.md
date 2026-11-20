@@ -1,6 +1,6 @@
 # Outfitter
 
-Rent and book, for a shop that rents things by the day: kayaks, paddleboards, bikes, skis. A guest picks days and how many, says who's riding and signs the waiver, pays once, and gets a pickup code. The counter hands rentals out and takes them back, and the guest's phone follows. A Potomac Solutions platform, built on the [kit](https://github.com/Potomac-Solutions/kit) and [Zubra](https://github.com/journey-to-code-org/zubra).
+Rent and book, for a shop that rents things by the day: kayaks, paddleboards, bikes, skis. A guest picks days and how many, says who's riding and signs the waiver, pays once, and gets a pickup code. The counter hands rentals out and takes them back, and the guest's phone follows. A Potomac Solutions platform, built on the [kit](https://github.com/Potomac-Solutions/kit) and [Zubra](https://github.com/zubra-js/zubra).
 
 The shop it starts with, Lakeside Paddle & Pedal on Deep Creek Lake, is made up. Nothing here is really for rent, and payments are in test mode.
 
