@@ -63,6 +63,8 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfi
   // The people who run the shop: an owner and the staff they invite (the kit's staff module), in the
   // shop's own log; their pages and routes are the kit's too.
   const staff = createStaff({ store: desk.store, secure: production, ...(staffCost ? { cost: staffCost } : {}) });
+  // Staff are sent the counter's board: the document that says a rental was booked or moved.
+  desk.staffed((request) => staff.can(staff.session(request), 'staff'));
   // A message in an address shows only if the server signed it (kit/notice), so a link can't put
   // its own words in a page's alert.
   const notices = createNotices({ secret });
@@ -142,16 +144,16 @@ ${p.render('rental-status', { rental: rental.key, statusNow: rental.status, outN
 <section class="panel dock"><h2>At the dock</h2><p>${escape(shop.pickup)} Show this code at the counter.</p><div class="code">${code}</div><p>Code <strong>${escape(rental.key)}</strong> · waiver signed by ${escape(rental.signedBy)}</p></section>`;
   }
 
-  function counter(url) {
+  function counter(p, url) {
     const day = desk.counter();
     const row = (rental, action, label) =>
       `<tr><td><strong>${escape(rental.name || rental.signedBy)}</strong><br><small>${escape(rental.key)}</small></td><td>${escape(rental.fleet.name)}: ${escape(rental.units.join(', '))}<br><small>${rental.days.map(dayLabel).join(', ')}</small></td><td>${rental.riders.map((rider) => `${escape(rider.unit)}: ${escape(rider.name)} (${escape(rider.size)})`).join('<br>')}</td><td><form method="post" action="/counter/${action}"><input type="hidden" name="code" value="${escape(rental.key)}"><button type="submit">${label}</button></form></td></tr>`;
     const done = notices.read(url).done;
-    return `<section class="page-head"><h1>The counter</h1><p class="lede">Today, ${dayLabel(day.today)}. Hand rentals out and take them back; guests see it on their phones.</p></section>
+    return `${p.render('board-watch', { board: 'counter', revNow: desk.boardRev(), single: 'A new rental', plural: 'new rentals' })}<section class="page-head" data-live="head"><h1>The counter</h1><p class="lede">Today, ${dayLabel(day.today)}. Hand rentals out and take them back; guests see it on their phones.</p></section>
 ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}</p>` : ''}
 <form class="panel" method="post" action="/counter/out"><h2>A code from a guest</h2><label>Rental code<input name="code" autocomplete="off" spellcheck="false" required></label><button type="submit">Hand out</button></form>
-<section class="panel"><h2>Going out today <b class="count">${day.pickups.length}</b></h2>${day.pickups.length ? `<table><tbody>${day.pickups.map((rental) => row(rental, 'out', 'Hand out')).join('')}</tbody></table>` : '<p>Nothing waiting.</p>'}</section>
-<section class="panel"><h2>Out now <b class="count">${day.out.length}</b></h2>${day.out.length ? `<table><tbody>${day.out.map((rental) => row(rental, 'returned', 'Take back')).join('')}</tbody></table>` : '<p>Nothing out.</p>'}</section>
+<div class="stack" data-live="day"><section class="panel"><h2>Going out today <b class="count">${day.pickups.length}</b></h2>${day.pickups.length ? `<table><tbody>${day.pickups.map((rental) => row(rental, 'out', 'Hand out')).join('')}</tbody></table>` : '<p>Nothing waiting.</p>'}</section>
+<section class="panel"><h2>Out now <b class="count">${day.out.length}</b></h2>${day.out.length ? `<table><tbody>${day.out.map((rental) => row(rental, 'returned', 'Take back')).join('')}</tbody></table>` : '<p>Nothing out.</p>'}</section></div>
 <form class="panel" method="post" action="/counter/conditions"><h2>Today’s note</h2><label>What guests should know (the water, the wind, the trails)<textarea name="text" rows="2" maxlength="280">${escape(desk.conditions().text)}</textarea></label><button type="submit">Post it</button></form>`;
   }
 
@@ -381,7 +383,7 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
 
       if (url.pathname === '/counter') {
         if (!onShift) return signInPage();
-        return show(p, 'The counter', counter(url), { wide: true });
+        return show(p, 'The counter', counter(p, url), { wide: true });
       }
       send(res, 404, 'Not found');
     } catch (error) {

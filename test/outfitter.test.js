@@ -318,3 +318,40 @@ test('with JavaScript: the whole booking in the browser, and the page tells the 
   }
   await guest.context.close();
 });
+
+test('the counter’s lists are live: a rental booked for today and one handed out show without a reload, to staff only', async () => {
+  const desk = await phone(app, 'counter tablet');
+  await desk.post('/staff/sign-in', { email: OWNER.email, password: OWNER.password });
+  await desk.page.goto(`${app.base}/counter`);
+  await desk.page.waitForFunction(() => customElements.get('board-watch'));
+  await desk.page.waitForTimeout(400);
+  // The page is the same document throughout: a reload would lose this.
+  await desk.page.evaluate(() => (window.sameDocument = true));
+  await desk.page.fill('input[name=code]:not([type=hidden])', 'half-typed');
+
+  const guest = await phone(app, 'booking today', { javaScriptEnabled: false });
+  const { key } = await rent(app, guest, { fleet: 'bikes', days: [0], count: 1 });
+  const going = desk.page.locator('[data-live=day] section', { hasText: 'Going out today' });
+  await going.locator('tr', { hasText: key }).waitFor({ timeout: 5000 });
+  await desk.page.locator('board-watch [role=status]', { hasText: 'A new rental came in.' }).waitFor({ timeout: 2000 });
+  assert.equal(await desk.page.inputValue('input[name=code]:not([type=hidden])'), 'half-typed', 'what staff were typing is kept');
+
+  // Another tablet hands it out: this one follows.
+  const other = await phone(app, 'second tablet', { javaScriptEnabled: false });
+  await other.post('/staff/sign-in', { email: OWNER.email, password: OWNER.password });
+  await other.post('/counter/out', { code: key });
+  const out = desk.page.locator('[data-live=day] section', { hasText: 'Out now' });
+  await out.locator('tr', { hasText: key }).waitFor({ timeout: 5000 });
+  assert.equal(await desk.page.evaluate(() => window.sameDocument), true, 'never reloaded');
+
+  // The swapped-in row still works: its button takes the rental back.
+  await out.locator('tr', { hasText: key }).locator('button').click();
+  await desk.page.waitForURL(/done=/);
+  assert.equal(app.server.desk.store.get('rentals', key).status, 'returned');
+
+  // Staff are sent the board; a guest's page never is.
+  const pull = async (who) => (await who.context.request.get(`${app.base}/_zb/sync/pull?since=0`)).text();
+  assert.match(await pull(other), /boards/, 'staff pull the board');
+  assert.doesNotMatch(await pull(guest), /boards/, 'a guest does not');
+  await Promise.all([desk, guest, other].map((one) => one.context.close()));
+});
