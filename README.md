@@ -51,6 +51,14 @@ Node 22.13 or later. `SESSION_SECRET` is required in production; `DATA_DIR` says
 
 Every behaviour was broken on purpose once to check a test fails (19 caught). One can't be: the rule letting pages write collections the app doesn't list is also refused by Sync's scope, which is checked first.
 
+## How it looks
+
+- **The landing page** (`/`) is photo-led: the lake at sunrise, one line and one button (**Book a day out**), then each fleet as a card with its photograph, its price and its own button, today's note from the dock, how it works, and where to find the shed. Its words are `site` in `src/shop.js`; `src/site.js` lays it out.
+- **Photographs** are files in `public/photos/`: `hero`, `shed`, `lake`, and one per fleet named by its id (`kayaks`, `boards`, `bikes`), as `.jpg` or `.webp`. Replace a file and restart. The ones here were generated for this made-up shop; see `public/photos/README.md`.
+- **Type** is Outfit and DM Sans, self-hosted from `@fontsource`. The colours are tokens at the top of `public/base.css`.
+- **The counter** has its own page frame (`src/shell.js`): a sidebar at a desk, a bar and a sheet on a phone, light or dark following the device. Rentals going out today are counted beside its link. Tables become cards on a phone (`src/tables.js`).
+- **Checks.** With the app running and an owner set up, `OWNER=email,password npm run design-check` walks every page, books a paddleboard on the way, and checks five widths in light and dark.
+
 ## Not yet
 
 - The owner's admin: fleets, prices, the waiver and the season, now in `src/shop.js`.
