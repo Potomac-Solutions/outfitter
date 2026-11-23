@@ -130,3 +130,4 @@
 .today { padding-top: 1.25rem; }
 .today:empty { display: none; }
 .mine li span { text-transform: capitalize; }
+.mine li span { color: #fff; font-weight: 700; }

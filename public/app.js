@@ -18,7 +18,7 @@ label();
 const typing = (el) => el && (el.isContentEditable || /^(input|textarea|select)$/i.test(el.tagName));
 document.addEventListener('keydown', (event) => {
   if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return;
-  const go = { c: '/counter' }[event.key];
+  const go = { c: '/counter', r: '/admin/rentals' }[event.key];
   if (go) return void (location.href = go);
   if (event.key === '/') {
     const search = document.querySelector('input[name=q], input[name=code]');

@@ -20,12 +20,13 @@ const shots = args.includes('--shots') ? args[args.indexOf('--shots') + 1] : '';
 const base = (args.find((arg) => /^https?:/.test(arg)) ?? 'http://localhost:3000').replace(/\/$/, '');
 const WIDTHS = [320, 375, 768, 1280, 1920];
 
-// The guest books a paddleboard on the way, so the pages a booking makes (riders and waiver, pay,
-// the rental) are checked too. The owner is whoever you set up; pass OWNER=email,password.
-const [ownerEmail, ownerPassword] = (process.env.OWNER ?? 'owner@example.com,lakeside-owner-demo').split(',');
+// Against the demo (`npm run demo`). The guest books a paddleboard on the way, so the pages a
+// booking makes (riders and waiver, pay) are checked too.
 const ROLES = [
-  { name: 'guest', routes: ['/', '/rent/kayaks', '/rent/bikes', '/counter'], book: true },
-  { name: 'owner', signIn: ['/counter', ownerEmail, ownerPassword], routes: ['/counter', '/staff/people', '/staff/password'] },
+  { name: 'guest', routes: ['/', '/rent/kayaks', '/rent/bikes', '/account/sign-in', '/account/sign-up', '/account/forgot', '/counter'], book: true },
+  { name: 'customer', signIn: ['/account/sign-in', 'riley@example.com', 'lakeside-guest-demo'], routes: ['/', '/account'] },
+  { name: 'staff', signIn: ['/admin', 'counter@example.com', 'lakeside-staff-demo'], routes: ['/counter', '/admin', '/admin/reports'] },
+  { name: 'owner', signIn: ['/admin', 'owner@example.com', 'lakeside-owner-demo'], routes: ['/counter', '/admin', '/admin/rentals', '/admin/customers', '/admin/reports', '/admin/settings', '/admin/outbox', '/staff/people', '/staff/password'], first: ['/admin/rentals', '/admin/customers'] },
 ];
 
 /** Runs in the page: structure, labels and contrast. Returns a list of problems. */
@@ -147,6 +148,12 @@ for (const scheme of ['light', 'dark']) {
         await page.waitForLoadState('networkidle');
         routes.push(`/book/${key}`);
       }
+    }
+    // One rental and one customer, from the lists.
+    for (const list of role.first ?? []) {
+      await page.goto(base + list);
+      const href = await page.locator(`main a[href^="${list}/"]`).first().getAttribute('href').catch(() => null);
+      if (href) routes.push(href);
     }
     for (const route of routes) {
       const where = `${role.name} ${route} (${scheme})`;

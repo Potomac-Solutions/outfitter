@@ -219,3 +219,11 @@ kbd { padding: 0.05rem 0.4rem; border-radius: 0.3rem; background: rgb(255 255 25
 /* Outfitter: the counter. */
 .staff h2 .count { display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.6rem; padding: 0 0.4rem; margin-left: 0.3rem; border-radius: 999px; background: var(--glow); color: var(--on-glow); font-size: 0.85rem; vertical-align: middle; }
 .staff td form button { white-space: nowrap; }
+.staff dl > * { min-width: 0; }
+.staff dd { overflow-wrap: anywhere; }
+/* The counter's lists have no column names: on a phone each rental is a block, its button below. */
+@media (max-width: 44rem) {
+  .staff table:not(.cards), .staff table:not(.cards) tbody, .staff table:not(.cards) tr, .staff table:not(.cards) td { display: block; width: auto; }
+  .staff table:not(.cards) tr { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+  .staff table:not(.cards) td { padding: 0.15rem 0; border: 0; overflow-wrap: anywhere; }
+}

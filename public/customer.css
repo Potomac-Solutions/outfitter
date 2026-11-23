@@ -86,3 +86,4 @@ main > * { min-width: 0; }
   slot-picker .day span { min-width: 0; overflow-wrap: anywhere; }
 }
 checkout-form, booking-summary { min-width: 0; overflow-wrap: anywhere; }
+checkout-form fieldset { min-width: 0; }
