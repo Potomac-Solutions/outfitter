@@ -55,6 +55,7 @@ const parsePool = (pool) => {
 export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, sweepMs = 1000, now = Date.now } = {}) {
   // Who is asking, from a request: server.js says how.
   let who = () => null;
+  let onShift = () => false;
   // A guest's rentals are the ones booked from their browser, and, signed in, their account's.
   const owns = (guest, rental) => Boolean(guest && (rental.holder === guest.pub || (guest.customer && rental.customer === guest.customer)));
   const mine = (guest) => store.under('rentals').filter((rental) => owns(guest, rental)).map((rental) => rental.key);
@@ -62,15 +63,19 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
   const sync = createSyncServer({
     log: await sqliteLog(db),
     // Pages write nothing: every collection here is the server's.
-    authorize: serverOnly([...SERVER_ONLY, 'rentals', 'waivers', 'conditions', 'settings', 'audit'], ({ kind }) => kind === 'read'),
+    authorize: serverOnly([...SERVER_ONLY, 'rentals', 'waivers', 'conditions', 'settings', 'audit', 'boards'], ({ kind }) => kind === 'read'),
     // A page reads the conditions note and its own rentals; nobody else's names or sizes.
     scope({ request }) {
       const guest = who(request);
       const keys = guest ? mine(guest) : [];
-      return { conditions: true, ...(keys.length ? { rentals: keys } : {}) };
+      // The counter's board (a number that moves when a rental does) goes to staff only.
+      return { conditions: true, ...(keys.length ? { rentals: keys } : {}), ...(onShift(request) ? { boards: true } : {}) };
     },
   });
   const store = await syncStore(sync);
+  // A new rental is a new document, which no open page was made for. One document the server keeps
+  // says "the board changed"; the counter's page follows it and fetches the lists again.
+  const touch = () => store.write('boards', 'counter', { rev: (store.get('boards', 'counter')?.rev ?? 0) + 1 });
 
   // What the owner changed: written over the defaults in shop.js, in place, so prices and words
   // everywhere (the weekend rule included) follow.
@@ -138,6 +143,12 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
     identify(fn) {
       who = fn;
     },
+    /** `fn(request)`: is this a member of staff? They are sent the counter's board. */
+    staffed(fn) {
+      onShift = fn;
+    },
+    /** How many times the board has changed: open counter pages follow it (`boards/counter`). */
+    boardRev: () => store.get('boards', 'counter')?.rev ?? 0,
 
     /** A fleet's next days: how many are free each day, and whether the guest holds any. */
     days(fleet, pub = '') {
@@ -196,6 +207,7 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
         fields: { name: String(form.get('name') ?? '').trim().slice(0, 80), email: String(form.get('email') ?? '').trim().slice(0, 200), phone: String(form.get('phone') ?? '').trim().slice(0, 40), fleet: parsePool(booking.pools[0]).fleet, days: booking.pools.map((pool) => parsePool(pool).date), signedBy: waiver.signedBy, customer: guest.customer ?? '' },
         description: `${shop.name} rental (test mode)`,
       });
+      if (done.ok) await touch();
       return done.ok ? { ok: true, key } : { ...words(done), key };
     },
 
@@ -235,6 +247,7 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
       const rental = KEY.test(key) && store.get('rentals', key);
       if (!rental) return { error: 'That isn’t one of our rentals.' };
       const done = await rentals.advance(key, to);
+      if (done.ok) await touch();
       if (done.ok) return { ok: true, rental: { key, ...store.get('rentals', key), fleet: fleetsById.get(rental.fleet) } };
       if (done.error === 'wrong-step') return { error: { booked: 'That rental hasn’t gone out yet.', out: 'That rental is already out.', returned: 'That rental is already back.' }[done.at] ?? 'Not now.' };
       return { error: 'That didn’t go through.' };

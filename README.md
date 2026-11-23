@@ -55,6 +55,13 @@ npm test         # needs Chrome or Playwright's Chromium
 
 Node 26. `SESSION_SECRET` is required in production; `DATA_DIR` says where the database file goes. Behind a proxy (Railway, Fly, a load balancer), set `TRUST_PROXIES` to how many add to `X-Forwarded-For` (usually `1`), so a wrong-password lockout falls on the device guessing and not on everyone; left unset, no header is trusted and every sign-in counts as the proxy's address.
 
+## The counter's lists, live
+
+Sync follows one document, and a new rental is a new document that no element on the page was made for. So the server keeps one small document of its own, `boards/counter`, and adds one to its `rev` whenever a rental is booked, handed out or taken back (`touch()` in `src/rentals.js`). The counter's page carries `<board-watch>` (`src/components/board-watch.zb`), which follows that document; when `rev` moves it fetches the page again and swaps in the parts marked `data-live` (today's date, "Going out today" and "Out now"). Nothing flashes, the scroll stays where it was, focus returns to the same row's button, and a code half-typed in the box above is left alone.
+
+- **Only staff are sent it** (`scope` in `src/rentals.js`), and it holds a number, never a rental.
+- **Without JavaScript** the lists are as they were: right when the page is loaded.
+
 ## What the tests prove
 
 1. Without JavaScript: two days, two kayaks, the same boats both days, weekend prices; riders, sizes and the waiver; paying; the pickup code (symbology's drawing of the rental's code); those boats gone for everyone on those days; the rental on the home page.
@@ -74,6 +81,7 @@ Node 26. `SESSION_SECRET` is required in production; `DATA_DIR` says where the d
 14. A new price applies to new holds, weekend price included; paid rentals keep theirs. A bad price is refused.
 15. A turned-off customer is signed out and can't sign in; only an owner can turn them back on.
 16. The report's revenue matches the rentals; the CSV's days add up to it; a name starting with `=` opens in a spreadsheet as text.
+17. The counter's lists are live: a rental booked for today and one handed out on another tablet show without a reload, a half-typed code is kept, and the swapped-in row's button still works; staff are sent the board and a guest's page is not.
 
 Every behaviour was broken on purpose once to check a test fails (19 caught). One can't be: the rule letting pages write collections the app doesn't list is also refused by Sync's scope, which is checked first.
 
