@@ -333,6 +333,15 @@ test('the counter’s lists are live: a rental booked for today and one handed o
   const { key } = await rent(app, guest, { fleet: 'bikes', days: [0], count: 1 });
   const going = desk.page.locator('[data-live=day] section', { hasText: 'Going out today' });
   await going.locator('tr', { hasText: key }).waitFor({ timeout: 5000 });
+  // The count in the sidebar follows too: it says what a fresh page would.
+  const sideNow = /data-live="waiting-side">(?:<b[^>]*>(\d+)<\/b>)?/.exec(await desk.get('/counter'))?.[1] ?? '';
+  await desk.page.waitForFunction((want) => (document.querySelector('[data-live="waiting-side"]')?.textContent ?? '') === want, sideNow, { timeout: 5000 });
+  // A rental for a later day changes nothing the counter shows, so the board isn't touched.
+  const revBefore = app.server.desk.boardRev();
+  const later = await phone(app, 'booking next week', { javaScriptEnabled: false });
+  await rent(app, later, { fleet: 'kayaks', days: [6], count: 1 });
+  assert.equal(app.server.desk.boardRev(), revBefore, 'a later day leaves the board alone');
+  await later.context.close();
   await desk.page.locator('board-watch [role=status]', { hasText: 'A new rental came in.' }).waitFor({ timeout: 2000 });
   assert.equal(await desk.page.inputValue('input[name=code]:not([type=hidden])'), 'half-typed', 'what staff were typing is kept');
 
