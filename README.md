@@ -77,6 +77,15 @@ Node 26. `SESSION_SECRET` is required in production; `DATA_DIR` says where the d
 
 Every behaviour was broken on purpose once to check a test fails (19 caught). One can't be: the rule letting pages write collections the app doesn't list is also refused by Sync's scope, which is checked first.
 
+## How it looks
+
+- **The landing page** (`/`) is photo-led: the lake at sunrise, one line and one button (**Book a day out**), then each fleet as a card with its photograph, its price and its own button, today's note from the dock, how it works, and where to find the shed. Its words are `site` in `src/shop.js`; `src/site.js` lays it out.
+- **Photographs** are files in `public/photos/`: `hero`, `shed`, `lake`, and one per fleet named by its id (`kayaks`, `boards`, `bikes`), as `.jpg` or `.webp`. Replace a file and restart. The ones here were generated for this made-up shop; see `public/photos/README.md`.
+- **Type** is Outfit and DM Sans, self-hosted from `@fontsource`. The colours are tokens at the top of `public/base.css`.
+- **Accounts** (sign in, sign up, a customer's rentals) take the same type, buttons and cards; the small forms sit in a narrow card.
+- **The counter and the admin** share one page frame (`src/shell.js`): a sidebar at a desk; on a phone a bar on top, tabs along the bottom and the sidebar as a sheet. Light or dark follows the device, with a switch that remembers. Rentals going out today are counted beside **The counter**. Tables become cards on a phone (`src/tables.js`).
+- **Checks.** With the demo running (`npm run demo`), `npm run design-check` walks every page as a guest, a customer, staff and the owner, books a paddleboard on the way, and checks five widths in light and dark.
+
 ## Not yet
 
 - Adding or retiring units and whole fleets, and the season's dates, from the admin (they're still in `src/shop.js`).

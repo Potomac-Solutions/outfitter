@@ -32,16 +32,11 @@ export function createAdmin({ desk, customers, sent, now = Date.now }) {
   const paidAt = (rental) => rental.booked;
   const customerOf = (rental) => (rental.customer ? customers.get(rental.customer) : null);
 
-  function nav(here, owner) {
-    const link = (href, words) => `<a href="${href}"${here === href ? ' aria-current="page"' : ''}>${words}</a>`;
-    return `<nav class="admin-nav" aria-label="Admin"><small>Shop</small>${link('/admin', 'Overview')}${link('/admin/rentals', 'Rentals')}${link('/admin/customers', 'Customers')}${link('/counter', 'The counter')}${
-      owner ? `<small>Owner</small>${link('/admin/reports', 'Reports')}${link('/admin/settings', 'Settings')}${link('/staff/people', 'Staff')}${link('/admin/outbox', 'Outbox')}` : ''
-    }</nav>`;
-  }
-  const frame = (here, owner, bar, body) => `<div class="admin">${nav(here, owner)}<div class="admin-body">${bar}${body}</div></div>`;
+  // Each page used to wrap itself in the admin's navigation; src/shell.js does that now.
+  const frame = (_here, _owner, _bar, body) => body;
 
   function rentalRows(list) {
-    if (!list.length) return '<p>None.</p>';
+    if (!list.length) return '<p class="muted">Nothing here.</p>';
     return `<div class="table-wrap"><table><thead><tr><th scope="col">Rental</th><th scope="col">Customer</th><th scope="col">What</th><th scope="col">Days</th><th scope="col">Status</th><th scope="col" class="num">Paid</th></tr></thead><tbody>${list
       .map(
         (rental) =>
@@ -61,7 +56,6 @@ export function createAdmin({ desk, customers, sent, now = Date.now }) {
   const percent = (share) => `${Math.round(share * 100)}%`;
 
   return {
-    nav,
 
     dashboard({ who, owner, bar }) {
       const all = desk.allRentals();
@@ -81,7 +75,7 @@ export function createAdmin({ desk, customers, sent, now = Date.now }) {
         '/admin',
         owner,
         bar,
-        `<section><h1>Overview</h1><p class="lede">${escape(shop.name)}, ${dayLabel(day.today)}. Good to see you, ${escape(who.name.split(' ')[0])}.</p></section>
+        `<section class="page-head"><h1>Overview</h1><p class="lede">${escape(shop.name)}, ${dayLabel(day.today)}. Good to see you, ${escape(who.name.split(' ')[0])}.</p></section>
 <div class="tiles">
   <div class="tile"><span>Revenue, last 30 days</span><strong>${money(revenue)}</strong><small>${change === null ? 'No earlier month to compare' : `${change >= 0 ? '▲' : '▼'} ${Math.abs(change)}% on the 30 days before`}</small></div>
   <div class="tile"><span>Rentals, last 30 days</span><strong>${last30.length}</strong><small>${before30.length} the 30 days before</small></div>
@@ -128,9 +122,9 @@ export function createAdmin({ desk, customers, sent, now = Date.now }) {
         '/admin/rentals',
         owner,
         bar,
-        `<section><h1>Rentals</h1><p class="lede">${list.length} rental${list.length === 1 ? '' : 's'}, ${money(totals(list, { amount: (rental) => rental.cents }).amount)} in all.</p></section>
+        `<section class="page-head"><h1>Rentals</h1><p class="lede">${list.length} rental${list.length === 1 ? '' : 's'}, ${money(totals(list, { amount: (rental) => rental.cents }).amount)} in all.</p></section>
 <form class="panel filters" method="get" action="/admin/rentals">
-  <label>Search<input name="q" value="${escape(url.searchParams.get('q') ?? '')}" placeholder="Name, email or code"></label>
+  <label class="grow">Search<input name="q" type="search" value="${escape(url.searchParams.get('q') ?? '')}" placeholder="Name, email or code"></label>
   <label>Status<select name="status">${option('', 'Any', url.searchParams.get('status') ?? '')}${Object.entries(STATUS).map(([value, words]) => option(value, words, url.searchParams.get('status'))).join('')}</select></label>
   <label>Fleet<select name="fleet">${option('', 'Any', url.searchParams.get('fleet') ?? '')}${desk.fleets.map((one) => option(one.id, escape(one.name), url.searchParams.get('fleet'))).join('')}</select></label>
   <button type="submit">Show</button>
@@ -164,7 +158,7 @@ ${pages > 1 ? `<p class="pager">${page > 1 ? `<a href="${escape(keep({ page: pag
         '/admin/rentals',
         owner,
         bar,
-        `<section><a href="/admin/rentals">All rentals</a><h1>${what(rental)} · ${escape(rental.fleet.name)}</h1><p class="lede">${escape(rental.key)} · ${badge(rental.status)}</p></section>
+        `<section class="page-head"><a class="back" href="/admin/rentals">All rentals</a><h1>${what(rental)} · ${escape(rental.fleet.name)}</h1><p class="lede">${escape(rental.key)} · ${badge(rental.status)}</p></section>
 ${said}
 <section class="two">
   <div class="panel"><h2>The booking</h2><dl class="facts"><dt>Days</dt><dd>${rental.days.map(dayLabel).join(', ')}</dd><dt>Units</dt><dd>${escape(rental.units.join(', '))}</dd><dt>Paid</dt><dd>${money(rental.cents)} (test mode)</dd>${rental.lines.map((line) => `<dt>${escape(line.unit)}, ${dayLabel(line.pool.slice(line.pool.indexOf('/') + 1))}</dt><dd>${money(line.cents)}${line.applied?.length ? ` <small class="muted">${escape(line.applied.join(', '))}</small>` : ''}</dd>`).join('')}</dl>
@@ -196,8 +190,8 @@ ${said}
         '/admin/customers',
         owner,
         bar,
-        `<section><h1>Customers</h1><p class="lede">${customers.list().length} with accounts; ${guests} more booked as guests.</p></section>
-<form class="panel filters" method="get" action="/admin/customers"><label>Search<input name="q" value="${escape(url.searchParams.get('q') ?? '')}" placeholder="Name or email"></label><button type="submit">Show</button><a class="button light" href="/admin/customers.csv">Download CSV</a></form>
+        `<section class="page-head"><h1>Customers</h1><p class="lede">${customers.list().length} with accounts; ${guests} more booked as guests.</p></section>
+<form class="panel filters" method="get" action="/admin/customers"><label class="grow">Search<input name="q" type="search" value="${escape(url.searchParams.get('q') ?? '')}" placeholder="Name or email"></label><button type="submit">Show</button><a class="button light" href="/admin/customers.csv">Download CSV</a></form>
 <section class="panel"><div class="table-wrap"><table><thead><tr><th scope="col">Customer</th><th scope="col">Joined</th><th scope="col" class="num">Rentals</th><th scope="col" class="num">Spent</th><th scope="col">Last booked</th></tr></thead><tbody>${list
           .map((one) => {
             const s = stats.get(one.customer) ?? { count: 0, cents: 0, last: 0 };
@@ -225,13 +219,13 @@ ${said}
         '/admin/customers',
         owner,
         bar,
-        `<section><a href="/admin/customers">All customers</a><h1>${escape(one.name)}</h1><p class="lede">${escape(one.email)} · joined ${dateTime(one.at)}${one.disabled ? ' · <span class="badge off">Turned off</span>' : ''}</p></section>
+        `<section class="page-head"><a class="back" href="/admin/customers">All customers</a><h1>${escape(one.name)}</h1><p class="lede">${escape(one.email)} · joined ${dateTime(one.at)}${one.disabled ? ' · <span class="badge off">Turned off</span>' : ''}</p></section>
 ${said}
 <div class="tiles"><div class="tile"><span>Rentals</span><strong>${rentals.length}</strong></div><div class="tile"><span>Spent</span><strong>${money(totals(rentals, { amount: (rental) => rental.cents }).amount)}</strong></div><div class="tile"><span>Favourite</span><strong>${escape(breakdown(rentals, { key: (rental) => rental.fleet.name })[0]?.key ?? '—')}</strong></div></div>
 <section class="panel"><h2>Rentals</h2>${rentalRows(rentals)}</section>
 ${
   owner
-    ? `<section class="panel"><h2>Account</h2><p>Turning an account off signs it out everywhere; its rentals stay.</p><div class="filters"><form method="post" action="/admin/customers/${escape(one.customer)}/disabled"><input type="hidden" name="disabled" value="${one.disabled ? 'no' : 'yes'}"><button type="submit" class="${one.disabled ? '' : 'button light'}">${one.disabled ? 'Turn back on' : 'Turn off'}</button></form>${one.disabled ? '' : `<form method="post" action="/admin/customers/${escape(one.customer)}/reset"><button class="button light" type="submit">Email a reset link</button></form>`}</div></section>`
+    ? `<section class="panel"><h2>Account</h2><p>Turning an account off signs it out everywhere; its rentals stay.</p><div class="filters">${one.disabled ? `<form method="post" action="/admin/customers/${escape(one.customer)}/disabled"><input type="hidden" name="disabled" value="no"><button type="submit">Turn back on</button></form>` : `<details class="confirm"><summary>Turn this account off…</summary><div class="sure"><p><strong>${escape(one.name)} will be signed out everywhere and won’t be able to sign in.</strong> What they have with the shop stays, and an owner can turn the account back on.</p><form method="post" action="/admin/customers/${escape(one.customer)}/disabled"><input type="hidden" name="disabled" value="yes"><button type="submit">Yes, turn it off</button></form></div></details>`}${one.disabled ? '' : `<form method="post" action="/admin/customers/${escape(one.customer)}/reset"><button class="button light" type="submit">Email a reset link</button></form>`}</div></section>`
     : ''
 }`,
       );
@@ -275,7 +269,7 @@ ${
         '/admin/reports',
         owner,
         bar,
-        `<section><h1>Reports</h1><p class="lede">${label}${fleet ? `, ${escape(fleet.name.toLowerCase())}` : ''}, by ${by}, in the shop’s time (${escape(zone)}). Counted on the day each rental was paid for.</p></section>
+        `<section class="page-head"><h1>Reports</h1><p class="lede">${label}${fleet ? `, ${escape(fleet.name.toLowerCase())}` : ''}, by ${by}, in the shop’s time (${escape(zone)}). Counted on the day each rental was paid for.</p></section>
 <div class="panel filters" role="group" aria-label="Range and fleet">${Object.entries(RANGES).map(([key, one]) => chip(link({ range: key }), one.label, key === range)).join('')}
 <span class="muted">·</span>${chip(link({ fleet: '' }), 'All fleets', !fleet)}${desk.fleets.map((one) => chip(link({ fleet: one.id }), escape(one.name), fleet?.id === one.id)).join('')}</div>
 <div class="tiles">
@@ -316,7 +310,7 @@ ${
         '/admin/settings',
         owner,
         bar,
-        `<section><h1>Settings</h1><p class="lede">Prices and words guests see. A change applies to new bookings at once; paid rentals keep their price.</p></section>
+        `<section class="page-head"><h1>Settings</h1><p class="lede">Prices and words guests see. A change applies to new bookings at once; paid rentals keep their price.</p></section>
 ${said}
 <section class="two">${desk.fleets
           .map(
@@ -343,8 +337,8 @@ ${said}
         '/admin/outbox',
         owner,
         bar,
-        `<section><h1>Outbox</h1><p class="lede">This demo sends no real email. What it would have sent since the server started is here, newest first.</p></section>
-<section class="panel">${list.length ? list.map((message) => `<article class="stack" style="border-top:1px solid var(--border);padding-top:0.75rem"><p><strong>${escape(message.subject)}</strong><br><small class="muted">To ${escape(message.to)}</small></p><pre style="white-space:pre-wrap;margin:0">${escape(message.body)}</pre></article>`).join('') : '<p>Nothing sent yet.</p>'}</section>`,
+        `<section class="page-head"><h1>Outbox</h1><p class="lede">This demo sends no real email. What it would have sent since the server started is here, newest first.</p></section>
+<section class="panel">${list.length ? list.map((message) => `<article class="message"><p><strong>${escape(message.subject)}</strong><br><small class="muted">To ${escape(message.to)}</small></p><pre>${escape(message.body)}</pre></article>`).join('') : '<p>Nothing sent yet.</p>'}</section>`,
       );
     },
   };
