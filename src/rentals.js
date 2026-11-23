@@ -207,7 +207,8 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
         fields: { name: String(form.get('name') ?? '').trim().slice(0, 80), email: String(form.get('email') ?? '').trim().slice(0, 200), phone: String(form.get('phone') ?? '').trim().slice(0, 40), fleet: parsePool(booking.pools[0]).fleet, days: booking.pools.map((pool) => parsePool(pool).date), signedBy: waiver.signedBy, customer: guest.customer ?? '' },
         description: `${shop.name} rental (test mode)`,
       });
-      if (done.ok) await touch();
+      // The counter lists what goes out today: a rental for a later day changes nothing it shows.
+      if (done.ok && (store.get('rentals', key)?.days ?? []).includes(bookableDays(now())[0])) await touch();
       return done.ok ? { ok: true, key } : { ...words(done), key };
     },
 
