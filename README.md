@@ -30,6 +30,40 @@ The shop it starts with, Lakeside Paddle & Pedal on Deep Creek Lake, is made up.
 9. **The counter**: today's pickups with riders and sizes; **Hand out** and **Take back**, which guests' phones show live, and the day's note, which every open page shows at once.
 10. **Without JavaScript** (turn it off in the browser's settings), all of it works the same.
 
+## The public demo
+
+With `DEMO=1` the server is a demo anyone can try, back office included (`src/demo.js`):
+
+- It runs on the seeded data (`npm run demo` seeds fresh, then serves), so the admin, reports and screens are full from the first visit.
+- The sign-in pages show the demo sign-ins:
+
+  | Who | Email | Password |
+  | --- | --- | --- |
+  | Owner | `owner@example.com` | `lakeside-owner-demo` |
+  | Staff | `counter@example.com` | `lakeside-staff-demo` |
+  | Customer | `riley@example.com` | `lakeside-guest-demo` |
+
+- Nobody can change a demo account: not its password, roles, name or reset link, and nobody can turn it off. Everything else a visitor does lasts until the reset, including people they invite.
+- Once a day at 4 am New York time the server exits, and Railway's "always" restart policy starts it again with `npm run demo`: fresh data dated today, and the same sign-ins.
+
+## Deploy the demo on Railway
+
+`railway.json` sets the build, the start command (`npm run demo`), the health check (`/health`) and the restart policy (`ALWAYS`).
+
+1. In Railway, make a service from `Potomac-Solutions/outfitter`, from the `main` branch. No volume is needed: every start seeds fresh.
+2. Set its variables:
+
+   ```
+   DEMO=1
+   NODE_ENV=production
+   SESSION_SECRET=<a long random string>
+   TRUST_PROXIES=1
+   PUBLIC_URL=https://<the demo's address>
+   ```
+3. Give it a domain under **Settings → Networking**, and keep it at one replica.
+
+For a real business, leave out `DEMO`, set `DATA_DIR` to a mounted volume, start it with `npm start`, and claim the first owner's setup link from the deploy log.
+
 ## How it is put together
 
 | Piece | Job |
