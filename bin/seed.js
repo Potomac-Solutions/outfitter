@@ -19,11 +19,9 @@ const db = join(process.env.DATA_DIR ?? join(here, '..'), 'outfitter.db');
 const fresh = process.argv.includes('--fresh');
 if (fresh) for (const file of [db, `${db}-wal`, `${db}-shm`]) if (existsSync(file)) rmSync(file);
 
-export const DEMO = {
-  owner: { email: 'owner@example.com', name: 'Dana Whitfield', password: 'lakeside-owner-demo' },
-  staff: { email: 'counter@example.com', name: 'Jordan Reyes', password: 'lakeside-staff-demo' },
-  customer: { email: 'riley@example.com', name: 'Riley Morgan', password: 'lakeside-guest-demo' },
-};
+// The demo sign-ins live in src/demo.js, so the public demo can show and protect them.
+import { DEMO } from '../src/demo.js';
+export { DEMO };
 
 // The same "random" shop every time.
 let seed = 20261115;

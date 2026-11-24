@@ -16,6 +16,7 @@ import { staffPages, clientAddress } from '@potomac-solutions/kit/staff/pages';
 import { createCustomers } from '@potomac-solutions/kit/customers';
 import { createNotify, outbox } from '@potomac-solutions/kit/notify';
 import { createNotices } from '@potomac-solutions/kit/notice';
+import { lockedStaff, lockedCustomers, staffSignIn, guestSignIn, nightly } from './src/demo.js';
 import { loadQr } from '@journey-to-code/symbology';
 import { createRentals, dayLabel } from './src/rentals.js';
 import { layout, escape } from './src/layout.js';
@@ -31,7 +32,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const STAFF_LINKS = ['/counter', '/admin', '/admin/rentals', '/admin/customers', '/admin/reports', '/admin/settings', '/admin/outbox', '/staff/people'];
 const components = join(here, 'src', 'components');
 
-export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfitter.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, now = Date.now, staffCost, publicUrl = process.env.PUBLIC_URL ?? '' } = {}) {
+export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfitter.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, now = Date.now, staffCost, publicUrl = process.env.PUBLIC_URL ?? '' , demo = process.env.DEMO === '1' } = {}) {
   if (!secret) {
     if (process.env.NODE_ENV === 'production') throw new Error('Set SESSION_SECRET.');
     secret = 'outfitter-development-only';
@@ -40,7 +41,9 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfi
   const guests = signedCookie({ secret, name: 'guest' });
   const production = process.env.NODE_ENV === 'production';
   // Customers who make an account (kit/customers), in the shop's own log.
-  const customers = createCustomers({ store: desk.store, secure: production, now, ...(staffCost ? { cost: staffCost } : {}) });
+  // The public demo (src/demo.js) refuses changes to its sign-ins.
+  const kitCustomers = createCustomers({ store: desk.store, secure: production, now, ...(staffCost ? { cost: staffCost } : {}) });
+  const customers = demo ? lockedCustomers(kitCustomers) : kitCustomers;
   // A page follows the rentals of its browser and, signed in, of its account.
   desk.identify((request) => {
     const guest = guests.session(request);
@@ -62,7 +65,8 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfi
 
   // The people who run the shop: an owner and the staff they invite (the kit's staff module), in the
   // shop's own log; their pages and routes are the kit's too.
-  const staff = createStaff({ store: desk.store, secure: production, ...(staffCost ? { cost: staffCost } : {}) });
+  const kitStaff = createStaff({ store: desk.store, secure: production, ...(staffCost ? { cost: staffCost } : {}) });
+  const staff = demo ? lockedStaff(kitStaff) : kitStaff;
   // Staff are sent the counter's board: the document that says a rental was booked or moved.
   desk.staffed((request) => staff.can(staff.session(request), 'staff'));
   // A message in an address shows only if the server signed it (kit/notice), so a link can't put
@@ -177,7 +181,7 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
       // Staff pages (the admin passes `wide`) go in the staff shell; the rest in the shop's own page.
       const staffHere = () => STAFF_LINKS.filter((href) => url.pathname === href || url.pathname.startsWith(`${href}/`)).sort((a, b) => b.length - a.length)[0] ?? '';
       const show = (p, title, body, { wide = false, here, ...options } = {}) => (wide ? staffPage(res, p, title, body, { here: staffHere(), ...options }) : page(res, p, title, body, { nav, here, ...options }));
-      const signInPage = () => show(zubra.page(), 'Sign in', `<div class="auth">${pages.signIn(url)}</div>`);
+      const signInPage = () => show(zubra.page(), 'Sign in', `<div class="auth">${demo ? staffSignIn(escape) : ''}${pages.signIn(url)}</div>`);
       if (url.pathname.startsWith('/account') || url.pathname.startsWith('/admin')) res.setHeader('cache-control', 'no-store');
 
       if (req.method === 'POST') {
@@ -224,7 +228,7 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
           }
           if (url.pathname === '/account/sign-in') {
             const signed = await customers.signIn(form.get('email'), form.get('password'), { client: clientAddress(req, { proxies }) });
-            if (signed.error) return show(p, 'Sign in', site.signIn({ problem: problem(signed.error === 'locked' ? 'Too many tries. Wait 15 minutes, or reset your password.' : 'That email and password don’t match.'), email: String(form.get('email') ?? '') }), { status: 401 });
+            if (signed.error) return show(p, 'Sign in', (demo ? `<div class="auth">${guestSignIn(escape)}</div>` : '') + site.signIn({ problem: problem(signed.error === 'locked' ? 'Too many tries. Wait 15 minutes, or reset your password.' : 'That email and password don’t match.'), email: String(form.get('email') ?? '') }), { status: 401 });
             await desk.claim(guest, signed.customer);
             res.setHeader('set-cookie', signed.cookie);
             return back(res, '/account');
@@ -274,7 +278,8 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
           const one = customerAction && customers.get(customerAction[1]);
           if (one && customerAction[2] === 'disabled') {
             const off = form.get('disabled') === 'yes';
-            await customers.setDisabled(one.customer, off);
+            const changed = await customers.setDisabled(one.customer, off);
+            if (changed?.error) return back(res, withProblem(`/admin/customers/${one.customer}`, changed));
             await desk.audit(who, `${off ? 'turned off' : 'turned back on'} ${one.name}’s account`, one.customer);
             return back(res, `/admin/customers/${one.customer}?done=${encodeURIComponent(off ? 'Turned off and signed out everywhere.' : 'Turned back on.')}`);
           }
@@ -326,7 +331,7 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
       const problem = notices.read(url).problem;
       const said = `${problem ? `<p class="notice" role="alert">${escape(problem)}</p>` : ''}${done(url)}`;
       if (url.pathname === '/account') return account ? show(p, 'Your account', site.account({ desk, guest, customer: account, said }), { here: '/account' }) : back(res, '/account/sign-in');
-      if (url.pathname === '/account/sign-in') return account ? back(res, '/account') : show(p, 'Sign in', site.signIn({ problem: said }), { here: '/account/sign-in' });
+      if (url.pathname === '/account/sign-in') return account ? back(res, '/account') : show(p, 'Sign in', (demo ? `<div class="auth">${guestSignIn(escape)}</div>` : '') + site.signIn({ problem: said }), { here: '/account/sign-in' });
       if (url.pathname === '/account/sign-up') return account ? back(res, '/account') : show(p, 'Make an account', site.signUp({ problem: said }));
       if (url.pathname === '/account/forgot') return show(p, 'Reset your password', site.forgot());
       if (url.pathname === '/account/reset') {
@@ -394,12 +399,13 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
   });
 
   server.on('close', () => desk.close());
-  return Object.assign(server, { desk, staff, customers, sent: mail.sent });
+  return Object.assign(server, { demo, desk, staff, customers, sent: mail.sent });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT ?? 3000);
   const server = await createApp();
   if (server.staff.needsOwner()) console.log(`Set up the first owner (works once, for a day): http://localhost:${port}/staff/accept?token=${await server.staff.setup()}`);
+  if (server.demo) nightly();
   server.listen(port, '0.0.0.0', () => console.log(`Outfitter on http://localhost:${port}`));
 }
