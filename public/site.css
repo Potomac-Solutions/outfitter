@@ -131,3 +131,12 @@
 .today:empty { display: none; }
 .mine li span { text-transform: capitalize; }
 .mine li span { color: #fff; font-weight: 700; }
+
+/* The hero is the lake: the words sit low on the water in one colour, and the place is a small label on the glass. */
+.hero-words { align-self: end; }
+.hero h1 { max-width: none; font-size: clamp(2.25rem, 6vw, 4.25rem); line-height: 1.12; letter-spacing: -0.02em; }
+.hero .go { background: var(--hot); color: #fff; box-shadow: none; }
+.hero .go:hover { background: var(--hot-ink); }
+.hero h1 em { color: inherit; }
+.hero .kicker { display: inline-block; padding: 0.35rem 0.85rem; border-radius: 999px; background: rgb(255 255 255 / 0.16); backdrop-filter: blur(6px); color: #fff; font-size: 0.98rem; }
+.hero::before { background: linear-gradient(0deg, rgb(var(--shade-rgb) / 0.92) 0%, rgb(var(--shade-rgb) / 0.45) 50%, rgb(var(--shade-rgb) / 0.12) 100%); }

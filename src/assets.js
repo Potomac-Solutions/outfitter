@@ -15,11 +15,11 @@ const TYPES = { '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.js
 
 /** The faces the pages use: [family, weight, style, package, file]. Latin only, a few KB each. */
 export const FONTS = [
-  ['Outfit', 700, 'normal', '@fontsource/outfit', 'outfit-latin-700-normal.woff2'],
-  ['Outfit', 600, 'normal', '@fontsource/outfit', 'outfit-latin-600-normal.woff2'],
-  ['DM Sans', 400, 'normal', '@fontsource/dm-sans', 'dm-sans-latin-400-normal.woff2'],
-  ['DM Sans', 600, 'normal', '@fontsource/dm-sans', 'dm-sans-latin-600-normal.woff2'],
-  ['DM Sans', 700, 'normal', '@fontsource/dm-sans', 'dm-sans-latin-700-normal.woff2'],
+  ['Plus Jakarta Sans', 700, 'normal', '@fontsource/plus-jakarta-sans', 'plus-jakarta-sans-latin-700-normal.woff2'],
+  ['Plus Jakarta Sans', 600, 'normal', '@fontsource/plus-jakarta-sans', 'plus-jakarta-sans-latin-600-normal.woff2'],
+  ['Inter', 400, 'normal', '@fontsource/inter', 'inter-latin-400-normal.woff2'],
+  ['Inter', 600, 'normal', '@fontsource/inter', 'inter-latin-600-normal.woff2'],
+  ['Inter', 700, 'normal', '@fontsource/inter', 'inter-latin-700-normal.woff2'],
 ];
 
 const files = new Map();
