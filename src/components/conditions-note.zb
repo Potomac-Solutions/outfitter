@@ -16,9 +16,9 @@
 </script>
 <style>
   :host { display: block; }
-  aside { display: grid; gap: 0.2rem; padding: 0.9rem 1.1rem; border-radius: var(--radius, 0.75rem); background: var(--note, #e6f2f7); border-left: 4px solid var(--primary, #1f6f8b); }
+  aside { display: grid; gap: 0.2rem; padding: 0.9rem 1.1rem; border-radius: var(--radius, 0.75rem); background: var(--note, #e6f4f1); border-left: 4px solid var(--primary, #0f3d5e); }
   p { margin: 0; }
-  small { color: var(--muted-foreground, #5b6b73); }
+  small { color: var(--muted-foreground, #526473); }
 </style>
 <conditions-note shop="" text-now="" at-now={0} at-label="" time-zone="America/New_York">
   <aside zb-if={text} aria-live="polite">

@@ -5,47 +5,47 @@
 */
 :root {
   /* Morning mist, lake teal, coral and sunrise: the shop's existing teal and amber, named. */
-  --paper: #f4f8f9;
+  --paper: #f7fafc;
   --paper-deep: #e3eef1;
-  --ink: #15262d;
-  --ink-soft: #4f626b;
-  --brand: #1a6680;
-  --brand-deep: #124a5e;
-  --brand-rgb: 26 102 128;
-  --night: #0d2832;
-  --night-rgb: 13 40 50;
-  --shade-rgb: 6 24 32;
-  --hot: #c2461f;
-  --hot-ink: #9c3615;
-  --hot-rgb: 194 70 31;
-  --glow: #ffb648;
-  --glow-hi: #ffc970;
-  --glow-rgb: 255 182 72;
-  --on-glow: #0d2832;
+  --ink: #1a252f;
+  --ink-soft: #526473;
+  --brand: #0f3d5e;
+  --brand-deep: #0b2e47;
+  --brand-rgb: 15 61 94;
+  --night: #0b2a41;
+  --night-rgb: 11 42 65;
+  --shade-rgb: 5 26 42;
+  --hot: #cc4532;
+  --hot-ink: #b53a29;
+  --hot-rgb: 204 69 50;
+  --glow: #e6f1f7;
+  --glow-hi: #ffffff;
+  --glow-rgb: 230 241 247;
+  --on-glow: #0b2a41;
   --on-hot: #fff;
   --on-night: #e6f0f3;
   --on-night-soft: #b3c7cf;
   --on-night-dim: #8aa2ac;
-  --line: #c9d6dc;
+  --line: #d9e4ec;
 
   --background: var(--paper);
   --foreground: var(--ink);
   --card: #ffffff;
   --card-foreground: var(--ink);
   --border: var(--line);
-  --input: #a9bbc3;
-  --muted: #e8eff2;
+  --input: #b3c3cf;
+  --muted: #edf2f6;
   --muted-foreground: var(--ink-soft);
   --primary: var(--brand);
   --primary-foreground: #fff;
   --ring: var(--hot);
   --accent: var(--hot);
-  --note: #e2f0f5;
+  --note: #e6f4f1;
   --radius: 1.1rem;
   --radius-sm: 0.6rem;
 
-  --font-heading: "Outfit", "Avenir Next", "Segoe UI", sans-serif;
-  --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Plus Jakarta Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --shadow: 0 1px 2px rgb(var(--night-rgb) / 0.06), 0 8px 24px -12px rgb(var(--night-rgb) / 0.18);
   --gutter: clamp(1rem, 4vw, 2.5rem);
   color-scheme: light;
@@ -208,3 +208,12 @@ tr.done { opacity: 0.6; }
   .site-head, .site-foot, .bagbar, .toast, .skip { display: none !important; }
   body { background: #fff; }
 }
+
+/* Shapes from the brief: 12px cards, 8px buttons and inputs, round status pills, and a navy focus ring. */
+:root { --ring: var(--brand); --radius: 12px; --radius-sm: 8px; }
+body :is(button:not(.action-button), .button, .go, .bag) { border-radius: 8px; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.site-head :focus-visible, .sec.dark :focus-visible, .hero :focus-visible, .side :focus-visible { outline-color: #fff; }
+body { font-size: 1rem; line-height: 1.55; }
+.ok { background: #e6f4f1; color: #1e6f5c; box-shadow: inset 3px 0 0 #1e6f5c; }
+.kicker { text-transform: none; letter-spacing: 0; font-size: 0.98rem; }

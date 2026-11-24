@@ -8,7 +8,7 @@ export const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => 
 
 /** Small drawings, as inline SVG: they take the shop's colours. Photographs are files in public/photos/. */
 export const art = {
-  mark: '<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0d2832"/><path d="M10 40c5-5 9-5 14 0s9 5 14 0 9-5 16 0M10 50c5-5 9-5 14 0s9 5 14 0 9-5 16 0" fill="none" stroke="#ffb648" stroke-width="4" stroke-linecap="round"/><circle cx="32" cy="22" r="8" fill="#ffb648"/></svg>',
+  mark: '<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0b2a41"/><path d="M10 40c5-5 9-5 14 0s9 5 14 0 9-5 16 0M10 50c5-5 9-5 14 0s9 5 14 0 9-5 16 0" fill="none" stroke="#e6f1f7" stroke-width="4" stroke-linecap="round"/><circle cx="32" cy="22" r="8" fill="#e6f1f7"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.800 7 11 7 11z"/><circle cx="12" cy="10" r="2.500"/></svg>',
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h4l1.500 5-2.200 1.600a12 12 0 0 0 5.100 5.100L16 12.500l5 1.500v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>',
@@ -43,10 +43,10 @@ export function layout({ title, shop, body, nav = {}, here = '', landing = false
   <meta property="og:title" content="${escape(fullTitle)}">
   <meta property="og:description" content="${escape(description)}">
   <meta property="og:type" content="website">
-  <meta name="theme-color" content="#0d2832">
+  <meta name="theme-color" content="#0b2a41">
   <link rel="icon" href="${asset('favicon.svg')}" type="image/svg+xml">
-  <link rel="preload" href="${asset('outfit-latin-700-normal.woff2')}" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="${asset('dm-sans-latin-400-normal.woff2')}" as="font" type="font/woff2" crossorigin>${landing && photo('hero') ? `
+  <link rel="preload" href="${asset('plus-jakarta-sans-latin-700-normal.woff2')}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="${asset('inter-latin-400-normal.woff2')}" as="font" type="font/woff2" crossorigin>${landing && photo('hero') ? `
   <link rel="preload" href="${photo('hero')}" as="image" fetchpriority="high">
   <meta property="og:image" content="${escape(canonical ? new URL(photo('hero'), canonical).href : photo('hero'))}">` : ''}
   <style>${FONT_CSS}</style>

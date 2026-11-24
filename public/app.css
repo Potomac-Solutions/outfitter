@@ -2,7 +2,7 @@
   The staff's side: the counter. Same shop, quieter: denser type, a sidebar, and a dark theme. Loaded after base.css; everything here is under body.staff.
 */
 body.staff {
-  --background: #eef4f6;
+  --background: #f7fafc;
   --card: #ffffff;
   --field: #fff;
   --ok-bg: #e2f1e4; --ok-fg: #174a2a;
@@ -18,8 +18,8 @@ body.staff {
   :root:not([data-theme=light]) body.staff {
     --background: #0a1a20; --foreground: #e3eef1; --card: #11272f; --card-foreground: #e3eef1; --field: #0a1a20;
     --border: #284550; --line: #284550; --input: #3d606d; --muted: #16323c; --muted-foreground: #a3b9c1;
-    --primary: #ffb648; --primary-foreground: #0d2832; --brand: #ffb648; --brand-deep: #ffc970; --brand-rgb: 255 182 72; --ring: #ffb648;
-    --hot: #f08a66; --hot-ink: #f5a98c; --accent: #f08a66; --note: #16323c; --ink: #e3eef1;
+    --primary: #e6f1f7; --primary-foreground: #0b2a41; --brand: #e6f1f7; --brand-deep: #ffffff; --brand-rgb: 230 241 247; --ring: #e6f1f7;
+    --hot: #e6f1f7; --hot-ink: #ffffff; --accent: #e6f1f7; --note: #16323c; --ink: #e3eef1;
     --ok-bg: #153823; --ok-fg: #a9e3bd; --bad-bg: #4a1a15; --bad-fg: #f6b8b0; --info-bg: #17324a; --info-fg: #b3d6f2; --warn-bg: #4a3410; --warn-fg: #f6d58f;
     --side: #061217; --shadow: none; color-scheme: dark;
   }
@@ -27,8 +27,8 @@ body.staff {
 :root[data-theme=dark] body.staff {
     --background: #0a1a20; --foreground: #e3eef1; --card: #11272f; --card-foreground: #e3eef1; --field: #0a1a20;
     --border: #284550; --line: #284550; --input: #3d606d; --muted: #16323c; --muted-foreground: #a3b9c1;
-    --primary: #ffb648; --primary-foreground: #0d2832; --brand: #ffb648; --brand-deep: #ffc970; --brand-rgb: 255 182 72; --ring: #ffb648;
-    --hot: #f08a66; --hot-ink: #f5a98c; --accent: #f08a66; --note: #16323c; --ink: #e3eef1;
+    --primary: #e6f1f7; --primary-foreground: #0b2a41; --brand: #e6f1f7; --brand-deep: #ffffff; --brand-rgb: 230 241 247; --ring: #e6f1f7;
+    --hot: #e6f1f7; --hot-ink: #ffffff; --accent: #e6f1f7; --note: #16323c; --ink: #e3eef1;
     --ok-bg: #153823; --ok-fg: #a9e3bd; --bad-bg: #4a1a15; --bad-fg: #f6b8b0; --info-bg: #17324a; --info-fg: #b3d6f2; --warn-bg: #4a3410; --warn-fg: #f6d58f;
     --side: #061217; --shadow: none; color-scheme: dark;
 }
@@ -228,3 +228,11 @@ kbd { padding: 0.05rem 0.4rem; border-radius: 0.3rem; background: rgb(255 255 25
   .staff table:not(.cards) td { padding: 0.15rem 0; border: 0; overflow-wrap: anywhere; }
 }
 .staff [data-live=day] { display: grid; gap: 1rem; }
+
+/* The back office's menu floats like a dock: a rounded panel set in from the edge. */
+@media (min-width: 56.01rem) {
+  .shell { grid-template-columns: 16.5rem minmax(0, 1fr); }
+  .side { top: 0.75rem; height: calc(100dvh - 1.5rem); margin: 0.75rem 0 0.75rem 0.75rem; border-radius: 1.4rem; }
+}
+.side nav a { border-radius: 8px; padding-inline: 0.9rem; }
+body.staff { --ok-bg: #e6f4f1; --ok-fg: #1e6f5c; --warn-bg: #fef3c7; --warn-fg: #9a5b13; --bad-bg: #fee2e2; --bad-fg: #991b1b; }
