@@ -140,3 +140,7 @@
 .hero h1 em { color: inherit; }
 .hero .kicker { display: inline-block; padding: 0.35rem 0.85rem; border-radius: 999px; background: rgb(255 255 255 / 0.16); backdrop-filter: blur(6px); color: #fff; font-size: 0.98rem; }
 .hero::before { background: linear-gradient(0deg, rgb(var(--shade-rgb) / 0.92) 0%, rgb(var(--shade-rgb) / 0.45) 50%, rgb(var(--shade-rgb) / 0.12) 100%); }
+
+/* The hero ends at the waterline: its bottom edge is the logo's wave, so the lake runs into the page. */
+.hero { -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - 17px) no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 18'%3E%3Cpath d='M0 9C8 0 24 0 32 9S56 18 64 9V18H0Z'/%3E%3C/svg%3E") bottom left / 64px 18px repeat-x; mask: linear-gradient(#000 0 0) top / 100% calc(100% - 17px) no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 18'%3E%3Cpath d='M0 9C8 0 24 0 32 9S56 18 64 9V18H0Z'/%3E%3C/svg%3E") bottom left / 64px 18px repeat-x; }
+.hero-strip { padding-bottom: 1.1rem; }
