@@ -1,6 +1,6 @@
 # Outfitter
 
-Rent and book, for a shop that rents things by the day: kayaks, paddleboards, bikes, skis. A guest picks days and how many, says who's riding and signs the waiver, pays once, and gets a pickup code. The counter hands rentals out and takes them back, and the guest's phone follows. A Potomac Solutions platform, built on the [kit](https://github.com/Potomac-Solutions/kit) and [Zubra](https://github.com/zubra-js/zubra).
+Rent and book, for a shop that rents things by the day: kayaks, paddleboards, bikes, skis. A guest picks days and how many, says who's riding and signs the waiver, pays once, and gets a pickup code. The counter hands rentals out and takes them back, and the guest's phone follows. A Potomac Solutions platform, built on the Potomac kit and [Zubra](https://github.com/zubra-js/zubra).
 
 The shop it starts with, Lakeside Paddle & Pedal on Deep Creek Lake, is made up. Nothing here is really for rent, and payments are in test mode.
 
@@ -68,7 +68,7 @@ For a real business, leave out `DEMO`, set `DATA_DIR` to a mounted volume, start
 
 | Piece | Job |
 | --- | --- |
-| [Potomac kit](https://github.com/Potomac-Solutions/kit) (private) | `hold` (who has which boat, and when a hold ends), `reserve` (the same boats on every day of a booking, priced, paid once), `pay` (charged at most once; its test provider), `stages` (a rental: booked, out, returned), `price` (the weekend rule), `staff` and `staff/pages` (the owner and staff: passwords, sessions, invites, roles, and their pages), `auth` (the guest and counter cookies), `store` (the Sync log). The kit's `slot-picker`, `booking-summary` and `checkout-form`, from its package |
+| Potomac kit (private) | `hold` (who has which boat, and when a hold ends), `reserve` (the same boats on every day of a booking, priced, paid once), `pay` (charged at most once; its test provider), `stages` (a rental: booked, out, returned), `price` (the weekend rule), `staff` and `staff/pages` (the owner and staff: passwords, sessions, invites, roles, and their pages), `auth` (the guest and counter cookies), `store` (the Sync log). The kit's `slot-picker`, `booking-summary` and `checkout-form`, from its package |
 | `@zubra/server` | Renders every page before any JavaScript runs |
 | `@zubra/sync` | The log (one SQLite file). The conditions note and each rental's status are documents only the server writes; pages follow them live, and read only the note and their own rentals |
 | [symbology](https://github.com/journey-to-code-org/symbology) | Draws the pickup code (the rental's code) |
@@ -82,7 +82,7 @@ For a real business, leave out `DEMO`, set `DATA_DIR` to a mounted volume, start
 ## Run it
 
 ```sh
-npm install      # needs read access to the private Potomac-Solutions/kit repository
+npm install      # needs read access to the private Potomac kit repository
 npm start        # http://localhost:3000
 npm test         # needs Chrome or Playwright's Chromium
 ```
