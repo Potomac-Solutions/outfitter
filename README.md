@@ -18,7 +18,7 @@ The shop it starts with, Lakeside Paddle & Pedal on Deep Creek Lake, is made up.
 
 **The public side**
 1. **The landing page** (`/`): the fleets and prices, how booking works, where and when, and the staff's note for the day.
-2. **Book.** Choose Kayaks, tick two days (a Saturday shows the weekend price) and how many, and **Hold**. You get the same kayaks every day you booked. **Book**, then name each rider and their size, agree to the waiver and sign. **Pay** with any card number (`4000 0000 0000 0002` is declined, to see that; your hold stays). You get the rental with its pickup code.
+2. **Book.** Choose Kayaks, tick two days (a Saturday shows the weekend price) and how many, and **Hold**. You get the same kayaks every day you booked. **Book**, then name each rider and their size, agree to the waiver and sign. **Pay** on Stripe's page (until Stripe is set up, the kit's test page: press **Pay**, or go back without paying and your hold stays). You get the rental with its pickup code.
 3. **An account** (`/account`): sign up, and rentals booked from this browser join it. Signed in on another device, they're there too, and checkout fills in your name and email. **Forgot your password?** sends a one-time link; this demo sends no real email, so it lands in the owner's **Outbox** (and the server's log).
 
 **The admin** (`/admin`, staff sign-in)
@@ -116,7 +116,7 @@ Sync follows one document, and a new rental is a new document that no element on
 1. Without JavaScript: two days, two kayaks, the same boats both days, weekend prices; riders, sizes and the waiver; paying; the pickup code (symbology's drawing of the rental's code); those boats gone for everyone on those days; the rental on the home page.
 2. The waiver comes first: each missing piece is refused with its own message, and paying before signing goes back to it.
 3. The last bike on a day goes to one person, even when two ask at the same moment; a booking gets the same bikes every day or none; letting go frees them.
-4. A declined card keeps the hold for another try, and the same booking is paid on the second. Another guest can't pay for it or see it. A hold that runs out books nothing.
+4. Backing out of the payment page keeps the hold for another try, and the same booking is paid on the second. The same booking on Stripe (faked) goes to Stripe Checkout and back, booked once, the webhook too. Another guest can't pay for it or see it. A hold that runs out books nothing.
 5. The counter needs a staff sign-in; it sees riders and sizes; it hands a rental out once and takes it back once, and the guest sees each step live.
 6. The note the counter posts reaches every open page at once, and is in the page without JavaScript.
 7. A page reads the note and its own rentals, nothing else, even when it asks; it writes nothing; another site's post is refused.
