@@ -52,7 +52,7 @@ const parsePool = (pool) => {
   return { fleet: pool.slice(0, at), date: pool.slice(at + 1) };
 };
 
-export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, sweepMs = 1000, now = Date.now } = {}) {
+export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, sweepMs = 1000, now = Date.now, provider = testProvider() } = {}) {
   // Who is asking, from a request: server.js says how.
   let who = () => null;
   let onShift = () => false;
@@ -92,10 +92,13 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
 
   const holds = createHolds({ store, holdMs, sweepMs, max: 6, now });
   const rentals = createStages({ store, collection: 'rentals', steps: ['booked', 'out', 'returned'], may: ({ to }) => to === 'out' || to === 'returned', now });
-  const reserve = createReserve({
+  // Paid on the platform's page (Stripe, for this shop): `wanted` keeps a let-go booking from being taken.
+  let reserve;
+  const pay = createPay({ provider, store, now, wanted: (id) => reserve.wanted(id) });
+  reserve = createReserve({
     store,
     holds,
-    pay: createPay({ provider: testProvider(), store, now }),
+    pay,
     stages: rentals,
     base: (unit, pool) => fleetsById.get(parsePool(pool).fleet).cents,
     // Weekend days cost the fleet's weekend price.
@@ -129,6 +132,10 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
     declined: () => 'That card was declined. Try another.',
     'in-progress': () => 'Your booking is already going through.',
     'lapsed-after-payment': () => 'Your hold ran out while the payment went through. The shop will refund it.',
+    'not-paid': () => 'That payment didn’t go through, so nothing was charged. Your boats are still held.',
+    cancelled: () => 'Nothing was charged. Your boats are still held for a few minutes.',
+    'not-set-up': () => 'Paying online isn’t working right now. Call the shop and we’ll book it.',
+    'provider-failed': () => 'The payment service didn’t answer. Try again in a minute.',
   };
   const words = (answer) => ({ error: (WORDS[answer.error] ?? (() => 'That didn’t go through. Try again.'))(answer) });
 
@@ -195,7 +202,7 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
     },
 
     /** Pay for a held, signed booking. Paid: the boats are taken on every day, and it's a rental. */
-    async book(guest, form) {
+    async book(guest, form, { back = '', cancel = '' } = {}) {
       // `guest.customer`, when signed in, goes on the rental so it follows the account.
       const key = String(form.get('checkout') ?? '');
       const booking = KEY.test(key) && store.get('bookings', key);
@@ -205,11 +212,48 @@ export async function createRentals({ db = ':memory:', holdMs = 10 * 60_000, swe
       const done = await reserve.book(guest.pub, key, {
         method: { card: String(form.get('card') ?? '') },
         fields: { name: String(form.get('name') ?? '').trim().slice(0, 80), email: String(form.get('email') ?? '').trim().slice(0, 200), phone: String(form.get('phone') ?? '').trim().slice(0, 40), fleet: parsePool(booking.pools[0]).fleet, days: booking.pools.map((pool) => parsePool(pool).date), signedBy: waiver.signedBy, customer: guest.customer ?? '' },
-        description: `${shop.name} rental (test mode)`,
+        description: `${shop.name} rental`,
+        back,
+        cancel,
       });
+      if (done.paying) return { ok: true, key, paying: true, pay: done.pay };
       // The counter lists what goes out today: a rental for a later day changes nothing it shows.
       if (done.ok && (store.get('rentals', key)?.days ?? []).includes(bookableDays(now())[0])) await touch();
       return done.ok ? { ok: true, key } : { ...words(done), key };
+    },
+
+    /** Back from the platform's page, or its webhook: once it's paid, it's a rental. */
+    async finish(key, { told } = {}) {
+      if (!KEY.test(key) || !store.get('bookings', key)) return { error: 'Your hold ran out. Pick your days again.' };
+      const done = await reserve.finish(key, { told });
+      if (done.ok && !done.again && (store.get('rentals', key)?.days ?? []).includes(bookableDays(now())[0])) await touch();
+      return done.ok ? { ok: true, key, again: Boolean(done.again) } : { ...words(done), key, code: done.error };
+    },
+
+    /** The webhook from the platform: `{ headers, body, url }`. */
+    async heard(request) {
+      const done = await reserve.heard(request);
+      if (done.ok && !done.again && (store.get('rentals', done.key)?.days ?? []).includes(bookableDays(now())[0])) await touch();
+      return done;
+    },
+
+    /**
+     * Backed out of the platform's page: nothing charged. The boats stay held while the hold
+     * lasts, so they can try again; it isn't taken while they're away.
+     */
+    async cancel(guest, key) {
+      const booking = KEY.test(key) && store.get('bookings', key);
+      if (!guest || !booking || booking.holder !== guest.pub) return { error: 'Your hold ran out. Pick your days again.' };
+      // Paid already (the platform took it before they backed out): it's a rental.
+      const done = await reserve.stopPaying(guest.pub, key);
+      if (done.ok && done.state !== 'failed' && store.get('rentals', key)) return { ok: true, key, paid: true };
+      return { ...words({ error: 'cancelled' }), key };
+    },
+
+    /** A rental by its key, whoever owns it (for the email once it's paid). */
+    rentalByKey(key) {
+      const rental = KEY.test(key) && store.get('rentals', key);
+      return rental ? { key, ...rental, fleet: fleetsById.get(rental.fleet) } : null;
     },
 
     /** A rental the guest owns, or null. */

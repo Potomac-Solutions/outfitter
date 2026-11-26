@@ -15,7 +15,7 @@ let server;
 let base;
 
 before(async () => {
-  server = await createApp({ staffCost: COST, db: join(dir, 'shop.db'), cache: false, secret: 'test' });
+  server = await createApp({ staffCost: COST, db: join(dir, 'shop.db'), cache: false, secret: 'test-only-secret-that-is-long-enough-1234' });
   await server.staff.accept(await server.staff.setup(), OWNER);
   const owner = server.staff.list().find((one) => one.email === OWNER.email);
   await server.staff.accept((await server.staff.invite(owner, { email: STAFF.email, name: STAFF.name, roles: ['staff'] })).token, STAFF);
@@ -71,7 +71,11 @@ async function rent(b, { fleet = 'kayaks', day = 2, email = 'pat@example.com' } 
   const key = /name="key" value="(r[a-z0-9]+)"/.exec((await b.get(`/rent/${fleet}`)).text)[1];
   const sizes = { kayaks: '5 ft to 5 ft 8 in', boards: '150 to 200 lb', bikes: '5 ft 4 in to 5 ft 9 in (M)' };
   await b.post(`/book/${key}/riders`, { 'name-0': 'Pat Quill', 'size-0': sizes[fleet], agree: 'yes', signature: 'Pat Quill' });
-  const paid = await b.post('/book', { checkout: key, name: 'Pat Quill', email, card: '4242 4242 4242 4242' });
+  const started = await b.post('/book', { checkout: key, name: 'Pat Quill', email });
+  // The test payment page, standing in for Stripe's: "Pay", then the way back.
+  const ref = new URL(started.location, base).searchParams.get('ref');
+  const back = new URL((await b.post('/pay/test', { ref, answer: 'pay' })).location);
+  const paid = await b.get(back.pathname + back.search);
   assert.equal(paid.location, `/rental/${key}`);
   return key;
 }

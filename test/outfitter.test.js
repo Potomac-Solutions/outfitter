@@ -32,7 +32,7 @@ let app;
 let quick; // holds that run out in a second and a half
 
 async function start(name, options = {}) {
-  const server = await withOwner(await createApp({ staffCost: COST, db: join(dir, `${name}.db`), cache: false, secret: 'test', ...options }));
+  const server = await withOwner(await createApp({ staffCost: COST, db: join(dir, `${name}.db`), cache: false, secret: 'test-only-secret-that-is-long-enough-1234', ...options }));
   await new Promise((done) => server.listen(0, done));
   return { server, base: `http://localhost:${server.address().port}` };
 }
@@ -79,8 +79,24 @@ async function rent(site, guest, { fleet = 'kayaks', days = [3], count = 1, card
   const key = keyOf(await guest.get(`/rent/${fleet}`));
   const signed = await guest.post(`/book/${key}/riders`, { ...ridersForm(riders ?? Array.from({ length: count }, (_, i) => [`Rider ${i} Teets`, choiceFor(fleet)])), agree: 'yes', signature: 'Sam Teets' });
   assert.equal(signed.location, `/book/${key}`, JSON.stringify(signed));
-  const paid = await guest.post('/book', { checkout: key, name: 'Sam Teets', email: 'sam@example.com', card });
+  const started = await guest.post('/book', { checkout: key, name: 'Sam Teets', email: 'sam@example.com' });
+  const paid = await through(site, guest, started, { pay: card !== DECLINED });
   return { key, paid };
+}
+
+/**
+ * The test payment page, by plain requests: "Pay" (or "Go back without paying"), then the way
+ * back. Where it ends up. Stripe's own page stands here until Stripe is set up.
+ */
+const DECLINED = '4000 0000 0000 0002';
+async function through(site, guest, answer, { pay = true } = {}) {
+  if (!answer.location.startsWith('/pay/test')) return answer;
+  const page = await guest.get(answer.location);
+  assert.match(page, /Once Stripe is set up, this page is Stripe’s own\./);
+  const ref = new URL(answer.location, site.base).searchParams.get('ref');
+  const next = pay ? (await guest.post('/pay/test', { ref, answer: 'pay' })).location : /href="([^"]+)">Go back without paying/.exec(page)[1].replaceAll('&amp;', '&');
+  const back = await guest.context.request.get(new URL(next, site.base).href, { maxRedirects: 0 });
+  return { status: back.status(), location: plain(back.headers().location ?? '') };
 }
 const CHOICES = { kayaks: '5 ft to 5 ft 8 in', boards: '150 to 200 lb', bikes: '5 ft 4 in to 5 ft 9 in (M)' };
 const choiceFor = (fleet) => CHOICES[fleet];
@@ -126,8 +142,11 @@ test('without JavaScript: pick days, sign the waiver, pay, and get a pickup code
   await page.waitForURL(/\/book\/r[a-z0-9]+$/);
   assert.match(await page.locator('main').innerText(), /Waiver signed by Rosa Bittinger/);
   await page.fill('checkout-form input[name=email]', 'rosa@example.com');
-  await page.fill('checkout-form input[name=card]', '4242 4242 4242 4242');
+  assert.equal(await page.locator('checkout-form input[name=card]').count(), 0, 'no card is typed here');
   await page.click('checkout-form button[type=submit]');
+  await page.waitForURL(/\/pay\/test\?ref=/);
+  assert.match(await page.locator('main').innerText(), /Test payment page\. No money moves[\s\S]*Once Stripe is set up/);
+  await page.click('button:has-text("Pay $")');
   await page.waitForURL(/\/rental\/r[a-z0-9]+$/);
   const key = page.url().split('/').pop();
   assert.match(await page.locator('main').innerText(), new RegExp(`2 kayaks[\\s\\S]*${k1}, ${k2}[\\s\\S]*\\$${expected / 100}`));
@@ -159,7 +178,7 @@ test('the waiver comes first: no riders, no sizes, no agreement or no full name,
   ];
   for (const [form, said] of tries) assert.equal((await guest.post(`/book/${key}/riders`, form)).location, `/book/${key}/riders?problem=${said}`);
   // Paying before signing goes back to the waiver.
-  assert.equal((await guest.post('/book', { checkout: key, name: 'Kai', email: 'k@example.com', card: '4242' })).location, `/book/${key}/riders?problem=Sign the waiver first.`);
+  assert.equal((await guest.post('/book', { checkout: key, name: 'Kai', email: 'k@example.com' })).location, `/book/${key}/riders?problem=Sign the waiver first.`);
   assert.equal(app.server.desk.store.get('bookings', key).state, 'held');
   // The pay page sends an unsigned booking back to the waiver too.
   assert.equal((await guest.context.request.get(`${app.base}/book/${key}`)).url(), `${app.base}/book/${key}`);
@@ -185,16 +204,16 @@ test('the last bike on a day goes to one person; the same bikes every day or non
   await Promise.all([first.context.close(), second.context.close(), third.context.close()]);
 });
 
-test('a declined card books nothing and keeps the hold, to try another; a hold that runs out books nothing', async () => {
+test('backing out of the payment page books nothing and keeps the hold, to try again; a hold that runs out books nothing', async () => {
   const guest = await phone(app, 'declined', { javaScriptEnabled: false });
   const { key, paid } = await rent(app, guest, { fleet: 'kayaks', days: [7], count: 1, card: '4000 0000 0000 0002' });
-  assert.equal(paid.location, `/book/${key}?problem=That card was declined. Try another.`);
+  assert.equal(paid.location, `/book/${key}?problem=Nothing was charged. Your boats are still held for a few minutes.`);
   assert.equal(app.server.desk.store.get('bookings', key).state, 'failed');
   assert.equal(free(app, 'kayaks', 7), 5, 'still held');
-  assert.equal((await guest.post('/book', { checkout: key, name: 'Sam', email: 's@example.com', card: '4242' })).location, `/rental/${key}`);
+  assert.equal((await through(app, guest, await guest.post('/book', { checkout: key, name: 'Sam', email: 's@example.com' }))).location, `/rental/${key}`);
   // Someone else's booking can't be paid with their form.
   const other = await phone(app, 'not theirs', { javaScriptEnabled: false });
-  assert.equal((await other.post('/book', { checkout: key, name: 'X', email: 'x@example.com', card: '4242' })).location, '/?problem=Your hold ran out. Pick your days again.');
+  assert.equal((await other.post('/book', { checkout: key, name: 'X', email: 'x@example.com' })).location, '/?problem=Your hold ran out. Pick your days again.');
   assert.equal((await other.context.request.get(`${app.base}/rental/${key}`)).status(), 404);
   await other.context.close();
   await guest.context.close();
@@ -205,7 +224,7 @@ test('a declined card books nothing and keeps the hold, to try another; a hold t
   await slow.post(`/book/${slowKey}/riders`, { 'name-0': 'Slow Poke', 'size-0': '5 ft to 5 ft 8 in', agree: 'yes', signature: 'Slow Poke' });
   await new Promise((done) => setTimeout(done, 2000));
   assert.equal(free(quick, 'kayaks', 2), 6, 'the hold ran out on the server');
-  const late = await slow.post('/book', { checkout: slowKey, name: 'Slow', email: 's@example.com', card: '4242' });
+  const late = await through(quick, slow, await slow.post('/book', { checkout: slowKey, name: 'Slow', email: 's@example.com' }));
   assert.ok(late.location.startsWith(`/book/${slowKey}?problem=`), late.location);
   assert.equal(quick.server.desk.store.get('rentals', slowKey), null);
   await slow.context.close();
@@ -308,8 +327,11 @@ test('with JavaScript: the whole booking in the browser, and the page tells the 
   await page.waitForFunction(() => customElements.get('checkout-form') && customElements.get('text-field'));
   await page.waitForTimeout(300);
   await page.fill('checkout-form input[name=email]', 'june@example.com');
-  await page.fill('checkout-form input[name=card]', '4242 4242 4242 4242');
+  assert.equal(await page.locator('checkout-form input[name=card]').count(), 0, 'no card is typed here');
   await page.click('checkout-form button[type=submit]');
+  await page.waitForURL(/\/pay\/test\?ref=/);
+  assert.match(await page.locator('main').innerText(), /Test payment page\. No money moves[\s\S]*Once Stripe is set up/);
+  await page.click('button:has-text("Pay $")');
   await page.waitForURL(/\/rental\/r[a-z0-9]+$/);
   await page.waitForFunction(() => customElements.get('rental-status'));
   // The kit's components come from its package; the app's own from its folder.
