@@ -22,6 +22,7 @@ import { createRentals, dayLabel } from './src/rentals.js';
 import { layout, escape } from './src/layout.js';
 import { shell } from './src/shell.js';
 import { cards } from './src/tables.js';
+import { createPayments } from './src/payments.js';
 import { serveAsset } from './src/assets.js';
 import * as site from './src/site.js';
 import { money } from './src/site.js';
@@ -32,12 +33,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const STAFF_LINKS = ['/counter', '/admin', '/admin/rentals', '/admin/customers', '/admin/reports', '/admin/settings', '/admin/outbox', '/staff/people'];
 const components = join(here, 'src', 'components');
 
-export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfitter.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, now = Date.now, staffCost, publicUrl = process.env.PUBLIC_URL ?? '' , demo = process.env.DEMO === '1' } = {}) {
+export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfitter.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, now = Date.now, staffCost, publicUrl = process.env.PUBLIC_URL ?? '' , demo = process.env.DEMO === '1', payEnv = process.env, payFetch } = {}) {
   if (!secret) {
     if (process.env.NODE_ENV === 'production') throw new Error('Set SESSION_SECRET.');
-    secret = 'outfitter-development-only';
+    secret = 'outfitter-development-only-not-a-real-secret';
   }
-  const desk = await createRentals({ db, holdMs, sweepMs, now });
+  // Stripe is this demo's platform; until its key is on the server, the kit's test page stands in.
+  const payments = createPayments({ env: payEnv, intended: 'stripe', fetch: payFetch });
+  const desk = await createRentals({ db, holdMs, sweepMs, now, provider: payments.provider });
   const guests = signedCookie({ secret, name: 'guest' });
   const production = process.env.NODE_ENV === 'production';
   // Customers who make an account (kit/customers), in the shop's own log.
@@ -55,7 +58,7 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'outfi
     send: mail.send,
     templates: {
       reset: ({ name, link }) => ({ subject: `Reset your ${desk.shop.name} password`, body: `Hi ${name},\n\nSomeone asked to reset the password for your account. This link works once, for an hour:\n\n${link}\n\nIf it wasn’t you, ignore this email.` }),
-      booked: ({ name, what, days, code, link, total }) => ({ subject: `Booked: ${what}`, body: `Hi ${name},\n\nYou’re booked: ${what}, ${days}. ${total}, paid (test mode).\n\nYour pickup code is ${code}. Show it at the dock shed:\n${link}\n\n${desk.shop.pickup}` }),
+      booked: ({ name, what, days, code, link, total }) => ({ subject: `Booked: ${what}`, body: `Hi ${name},\n\nYou’re booked: ${what}, ${days}. ${total}, paid${payments.sandbox ? ' (test mode)' : ''}.\n\nYour pickup code is ${code}. Show it at the dock shed:\n${link}\n\n${desk.shop.pickup}` }),
     },
   });
   const zubra = createZubra({ components, cache, packages: ['@potomac-solutions/kit/components'] });
@@ -131,6 +134,24 @@ ${said(url)}
 </form>`;
   }
 
+  /** Paid: the booking email once, and on to the rental. Not: back to paying, or the riders. */
+  /** The booking email, once, when a rental is first paid. */
+  async function tellBooked(req, key) {
+    const rental = desk.rentalByKey(key);
+    if (rental?.email) {
+      await notify.notify({ email: rental.email }, 'booked', { name: rental.name || rental.signedBy, what: `${rental.units.length} ${rental.units.length === 1 ? rental.fleet.one : rental.fleet.name.toLowerCase()}`, days: rental.days.map(dayLabel).join(', '), code: rental.key, link: `${origin(req)}/rental/${rental.key}`, total: money(rental.cents) });
+    }
+  }
+
+  /** Paid: the booking email once, and on to the rental. Not: back to paying, or the riders. */
+  async function afterBook(req, res, done) {
+    if (done.ok) {
+      if (!done.again) await tellBooked(req, done.key);
+      return back(res, `/rental/${done.key}`);
+    }
+    return back(res, done.key ? withProblem(done.error === 'Sign the waiver first.' ? `/book/${done.key}/riders` : `/book/${done.key}`, done) : withProblem('/', done));
+  }
+
   function pay(p, url, booking, fleet, account) {
     const cart = {
       lines: booking.lines.map((line) => ({ item: `${line.pool}/${line.unit}`, qty: 1, name: `${fleet.one[0].toUpperCase() + fleet.one.slice(1)} ${line.unit}, ${dayLabel(line.pool.slice(line.pool.indexOf('/') + 1))}`, total: line.cents })),
@@ -138,12 +159,12 @@ ${said(url)}
       ready: booking.state === 'held' || booking.state === 'failed',
     };
     return `<section class="page-head"><a class="back" href="/book/${booking.key}/riders">Back to riders</a><h1>Pay</h1><p class="lede">Held until ${time(booking.until)}. Waiver signed by ${escape(desk.waiver(booking.key).signedBy)}.</p></section>
-${p.render('checkout-form', { cart, place: '/book', checkout: booking.key, problem: notices.read(url).problem, testMode: true, name: account?.name ?? desk.waiver(booking.key).signedBy, email: account?.email ?? '' })}`;
+${p.render('checkout-form', { cart, place: '/book', checkout: booking.key, problem: notices.read(url).problem, ...payments.form, name: account?.name ?? desk.waiver(booking.key).signedBy, email: account?.email ?? '' })}`;
   }
 
   function rentalPage(p, rental) {
     const code = qr.svg(qr.encode(rental.key), { title: `Rental ${rental.key}` });
-    return `<section class="page-head"><p class="kicker">Rental · test mode</p><h1>${rental.units.length} ${escape(rental.units.length === 1 ? rental.fleet.one : rental.fleet.name.toLowerCase())}</h1><p class="lede">${rental.days.map(dayLabel).join(', ')} · ${escape(rental.units.join(', '))} · ${money(rental.cents)}</p></section>
+    return `<section class="page-head"><p class="kicker">Rental${payments.sandbox ? ' · test mode' : ''}</p><h1>${rental.units.length} ${escape(rental.units.length === 1 ? rental.fleet.one : rental.fleet.name.toLowerCase())}</h1><p class="lede">${rental.days.map(dayLabel).join(', ')} · ${escape(rental.units.join(', '))} · ${money(rental.cents)}</p></section>
 ${p.render('rental-status', { rental: rental.key, statusNow: rental.status, outNow: rental.out ?? 0, returnedNow: rental.returned ?? 0, timeZone: shop.timeZone })}
 <section class="panel dock"><h2>At the dock</h2><p>${escape(shop.pickup)} Show this code at the counter.</p><div class="code">${code}</div><p>Code <strong>${escape(rental.key)}</strong> · waiver signed by ${escape(rental.signedBy)}</p></section>`;
   }
@@ -184,6 +205,21 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
       const signInPage = () => show(zubra.page(), 'Sign in', `<div class="auth">${demo ? staffSignIn(escape) : ''}${pages.signIn(url)}</div>`);
       if (url.pathname.startsWith('/account') || url.pathname.startsWith('/admin')) res.setHeader('cache-control', 'no-store');
 
+      // Paying on the platform's page: the test page, the way back, backing out, and the webhook.
+      if (await payments.testRoute(req, res, url, readForm)) return;
+      if (url.pathname === '/pay/back' && req.method === 'GET') return afterBook(req, res, await desk.finish(url.searchParams.get('booking') ?? ''));
+      if (url.pathname === '/pay/cancel' && req.method === 'GET') {
+        const done = await desk.cancel(guest, url.searchParams.get('booking') ?? '');
+        return done.paid ? afterBook(req, res, done) : back(res, done.key ? withProblem(`/book/${done.key}`, done) : withProblem('/', done));
+      }
+      if (url.pathname === '/pay/webhook' && req.method === 'POST') {
+        const request = await payments.webhook(req, publicUrl || origin(req));
+        if (!request) return send(res, 413, 'Too large');
+        const heard = await desk.heard(request);
+        if (heard.ok && !heard.again) await tellBooked(req, heard.key);
+        return send(res, heard.error === 'bad-signature' ? 401 : 200, heard.error === 'bad-signature' ? 'Bad signature' : 'ok');
+      }
+
       if (req.method === 'POST') {
         // Every form is ours: another site's post is refused (the cookies are SameSite=Lax too).
         if (req.headers['sec-fetch-site'] === 'cross-site') return send(res, 403, 'Forbidden');
@@ -205,16 +241,12 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
           return back(res, done.ok ? `/book/${signing[1]}` : withProblem(`/book/${signing[1]}/riders`, done));
         }
         if (url.pathname === '/book') {
-          const done = await desk.book(guest, form);
-          if (done.ok) {
-            const rental = desk.rental(guest, done.key);
-            if (rental.email) {
-              await notify.notify({ email: rental.email }, 'booked', { name: rental.name || rental.signedBy, what: `${rental.units.length} ${rental.units.length === 1 ? rental.fleet.one : rental.fleet.name.toLowerCase()}`, days: rental.days.map(dayLabel).join(', '), code: rental.key, link: `${origin(req)}/rental/${rental.key}`, total: money(rental.cents) });
-            }
-            return back(res, `/rental/${done.key}`);
-          }
-          return back(res, done.key ? withProblem(done.error === 'Sign the waiver first.' ? `/book/${done.key}/riders` : `/book/${done.key}`, done) : withProblem('/', done));
+          const done = await desk.book(guest, form, { back: `${origin(req)}/pay/back`, cancel: `${origin(req)}/pay/cancel` });
+          if (done.paying) return payments.send(res, done.pay, { cancel: `/pay/cancel?booking=${done.key}`, fields: { booking: done.key } });
+          return afterBook(req, res, done);
         }
+        // Helcim's frame says it's paid: the kit checks with Helcim before believing it.
+        if (url.pathname === '/pay/told') return afterBook(req, res, await desk.finish(String(form.get('booking') ?? ''), { told: String(form.get('told') ?? '') }));
         // A customer's account.
         if (url.pathname.startsWith('/account/')) {
           const p = zubra.page();
@@ -399,7 +431,7 @@ ${said(url)}${done ? `<p class="ok" role="status">${escape(done.slice(0, 200))}<
   });
 
   server.on('close', () => desk.close());
-  return Object.assign(server, { demo, desk, staff, customers, sent: mail.sent });
+  return Object.assign(server, { payments, demo, desk, staff, customers, sent: mail.sent });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

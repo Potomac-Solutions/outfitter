@@ -18,7 +18,7 @@ The shop it starts with, Lakeside Paddle & Pedal on Deep Creek Lake, is made up.
 
 **The public side**
 1. **The landing page** (`/`): the fleets and prices, how booking works, where and when, and the staff's note for the day.
-2. **Book.** Choose Kayaks, tick two days (a Saturday shows the weekend price) and how many, and **Hold**. You get the same kayaks every day you booked. **Book**, then name each rider and their size, agree to the waiver and sign. **Pay** with any card number (`4000 0000 0000 0002` is declined, to see that; your hold stays). You get the rental with its pickup code.
+2. **Book.** Choose Kayaks, tick two days (a Saturday shows the weekend price) and how many, and **Hold**. You get the same kayaks every day you booked. **Book**, then name each rider and their size, agree to the waiver and sign. **Pay** on Stripe's page (until Stripe is set up, the kit's test page: press **Pay**, or go back without paying and your hold stays). You get the rental with its pickup code.
 3. **An account** (`/account`): sign up, and rentals booked from this browser join it. Signed in on another device, they're there too, and checkout fills in your name and email. **Forgot your password?** sends a one-time link; this demo sends no real email, so it lands in the owner's **Outbox** (and the server's log).
 
 **The admin** (`/admin`, staff sign-in)
@@ -64,6 +64,21 @@ With `DEMO=1` the server is a demo anyone can try, back office included (`src/de
 
 For a real business, leave out `DEMO`, set `DATA_DIR` to a mounted volume, start it with `npm start`, and claim the first owner's setup link from the deploy log.
 
+## Paying
+
+The customer pays on **Stripe**: the card is typed there, never here. Booking holds the boats while they're there, and makes it a rental once Stripe says it's paid: when they come back, or from Stripe's webhook. Backing out keeps the hold for another try. Stripe Checkout takes cards, and Link (Stripe’s saved details) when it’s turned on in the Dashboard (Settings → Payment methods).
+
+Until Stripe's settings are on the server, the kit's test page stands in. It is plainly a test, with no card and no money, and makes the same trip there and back. To use Stripe's test mode, set these on Railway:
+
+| Setting | What |
+| --- | --- |
+| `PAY_STRIPE_KEY` | A test secret key, `sk_test_…` (Stripe Dashboard → Developers → API keys, in test mode). A test key means test mode: no money moves |
+| `PAY_STRIPE_WEBHOOK_SECRET` | Optional: a webhook endpoint for `checkout.session.completed` and `checkout.session.async_payment_succeeded` at `https://outfitter.potomac.solutions/pay/webhook`, and its signing secret |
+
+`PAY_PROVIDER` picks another platform instead (`stripe`, `square`, `paypal`, `helcim`), with its own settings as in the kit's README. Nothing else changes. Keep the public demo on test keys: with live ones, real money moves.
+
+`SESSION_SECRET` must be at least 32 characters now (the kit refuses a shorter one).
+
 ## How it is put together
 
 | Piece | Job |
@@ -101,7 +116,7 @@ Sync follows one document, and a new rental is a new document that no element on
 1. Without JavaScript: two days, two kayaks, the same boats both days, weekend prices; riders, sizes and the waiver; paying; the pickup code (symbology's drawing of the rental's code); those boats gone for everyone on those days; the rental on the home page.
 2. The waiver comes first: each missing piece is refused with its own message, and paying before signing goes back to it.
 3. The last bike on a day goes to one person, even when two ask at the same moment; a booking gets the same bikes every day or none; letting go frees them.
-4. A declined card keeps the hold for another try, and the same booking is paid on the second. Another guest can't pay for it or see it. A hold that runs out books nothing.
+4. Backing out of the payment page keeps the hold for another try, and the same booking is paid on the second. The same booking on Stripe (faked) goes to Stripe Checkout and back, booked once, the webhook too. Another guest can't pay for it or see it. A hold that runs out books nothing.
 5. The counter needs a staff sign-in; it sees riders and sizes; it hands a rental out once and takes it back once, and the guest sees each step live.
 6. The note the counter posts reaches every open page at once, and is in the page without JavaScript.
 7. A page reads the note and its own rentals, nothing else, even when it asks; it writes nothing; another site's post is refused.
